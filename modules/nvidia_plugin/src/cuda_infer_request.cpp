@@ -578,6 +578,8 @@ InferenceEngine::Precision::ePrecision CudaInferRequest::convertType(ov::element
             return Precision::I16;
         case Type_t::i32:
             return Precision::I32;
+        case Type_t::i64:
+            return Precision::I64;
         case Type_t::boolean:
             return Precision::BOOL;
         default:

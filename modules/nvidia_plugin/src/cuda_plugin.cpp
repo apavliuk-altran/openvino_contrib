@@ -39,39 +39,50 @@ InferenceEngine::IExecutableNetworkInternal::Ptr Plugin::LoadExeNetworkImpl(cons
                                                                             const ConfigMap& config) {
     OV_ITT_SCOPED_TASK(itt::domains::nvidia_gpu, "Plugin::LoadExeNetworkImpl");
 
+    using InferenceEngine::Precision;
+
     auto cfg = Configuration{config, _cfg};
     InferenceEngine::InputsDataMap networkInputs = network.getInputsInfo();
     InferenceEngine::OutputsDataMap networkOutputs = network.getOutputsInfo();
+
+    std::set<Precision> supportedPrecisions{Precision::FP32,
+                                            Precision::FP16,
+                                            Precision::I64,
+                                            Precision::I32,
+                                            Precision::I16,
+                                            Precision::U8,
+                                            Precision::I8,
+                                            Precision::BOOL};
+
+    auto isSupported = [&supportedPrecisions](const Precision& precision) {
+        return supportedPrecisions.count(precision) != 0;
+    };
+
+    auto getSupportedNames = [&supportedPrecisions] {
+        std::stringstream ss;
+        for (const auto& p : supportedPrecisions) {
+            ss << p.name() << ' ';
+        }
+        return ss.str();
+    };
 
     // TODO: check with precisions supported by Cuda device
 
     for (auto networkOutput : networkOutputs) {
         auto output_precision = networkOutput.second->getPrecision();
-
-        if (output_precision != InferenceEngine::Precision::FP32 &&
-            output_precision != InferenceEngine::Precision::FP16 &&
-            output_precision != InferenceEngine::Precision::I32 &&
-            output_precision != InferenceEngine::Precision::I16 && output_precision != InferenceEngine::Precision::U8 &&
-            output_precision != InferenceEngine::Precision::I8 &&
-            output_precision != InferenceEngine::Precision::BOOL) {
+        if (!isSupported(output_precision)) {
             throwIEException(
                 fmt::format("Output format {} is not supported yet. Supported "
-                            "formats are: FP32, FP16, I32, I16, I8, U8 and BOOL.",
-                            output_precision));
+                            "formats are: {}", output_precision.name(), getSupportedNames()));
         }
     }
 
     for (auto networkInput : networkInputs) {
         auto input_precision = networkInput.second->getTensorDesc().getPrecision();
-
-        if (input_precision != InferenceEngine::Precision::FP32 &&
-            input_precision != InferenceEngine::Precision::FP16 && input_precision != InferenceEngine::Precision::I32 &&
-            input_precision != InferenceEngine::Precision::I16 && input_precision != InferenceEngine::Precision::U8 &&
-            input_precision != InferenceEngine::Precision::I8 && input_precision != InferenceEngine::Precision::BOOL) {
+        if (!isSupported(input_precision)) {
             throwIEException(
                 fmt::format("Input format {} is not supported yet. Supported "
-                            "formats are: FP32, FP16, I32, I16, I8, U8 and BOOL.",
-                            input_precision));
+                            "formats are: {}", input_precision.name(), getSupportedNames()));
         }
     }
 
