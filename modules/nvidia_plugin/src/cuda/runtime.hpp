@@ -13,6 +13,16 @@
 
 #include "props.hpp"
 
+
+
+
+
+#include <iostream>
+
+
+
+
+
 inline void throwIfError(
     cudaError_t err,
     const std::experimental::source_location& location = std::experimental::source_location::current()) {
@@ -125,11 +135,33 @@ inline int maxConcurrentStreams(CUDA::Device d) {
 
 inline bool isHalfSupported(CUDA::Device d) {
     const auto computeCompatabilityVersion = std::to_string(d.props().major) + "." + std::to_string(d.props().minor);
+
+
+    std::cout << "**********************************************************************************************\n";
+    std::cout << "isHalfSupported()\n";
+    std::cout << "computeCompatabilityVersion = " << computeCompatabilityVersion << "\n";
+    std::cout << "fp16SupportedArchitecture.count(computeCompatabilityVersion) = " <<
+                 fp16SupportedArchitecture.count(computeCompatabilityVersion) << '\n';
+    std::cout << "**********************************************************************************************\n";
+
+
+
     return fp16SupportedArchitecture.count(computeCompatabilityVersion) > 0;
 }
 
 inline bool isInt8Supported(CUDA::Device d) {
     const auto computeCompatabilityVersion = std::to_string(d.props().major) + "." + std::to_string(d.props().minor);
+
+
+    std::cout << "**********************************************************************************************\n";
+    std::cout << "isInt8Supported()\n";
+    std::cout << "computeCompatabilityVersion = " << computeCompatabilityVersion << "\n";
+    std::cout << "int8SupportedArchitecture.count(computeCompatabilityVersion) = " <<
+                 int8SupportedArchitecture.count(computeCompatabilityVersion) << '\n';
+    std::cout << "**********************************************************************************************\n";
+
+
+
     return int8SupportedArchitecture.count(computeCompatabilityVersion) > 0;
 }
 
