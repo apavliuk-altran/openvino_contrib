@@ -24,13 +24,32 @@ SubGraph::SubGraph(const CreationContext& context,
                    const SubGraphOp& op,
                    IndexCollection&& inputIds,
                    IndexCollection&& outputIds)
+<<<<<<< HEAD
     : OperationBase(context, op, std::move(inputIds), std::move(outputIds)), model_{op.get_function()} {
+=======
+    : OperationBase(context, op, std::move(inputIds), std::move(outputIds)), function_{op.get_function()},
+      graph_created_{false} {
+    // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+    // std::cout << "SubGraph::SubGraph --1--\n";
+    // std::cout << std::boolalpha << "graph_created_ = " << graph_created_ << '\n';
+    // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+>>>>>>> Add base CudaGraph support
     const bool isStableParamsAndResultsNeeded = nullptr != dynamic_cast<const ov::op::v0::TensorIterator*>(&op);
     initExecuteSequence(context, isStableParamsAndResultsNeeded, isStableParamsAndResultsNeeded);
 }
 
+<<<<<<< HEAD
 SubGraph::SubGraph(const CreationContext& context, const std::shared_ptr<const ov::Model>& model)
     : OperationBase(context, nullptr), model_{model} {
+=======
+SubGraph::SubGraph(const CreationContext& context, const std::shared_ptr<const ngraph::Function>& function)
+    : OperationBase(context, nullptr), function_{function},
+      graph_created_{false} {
+    // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+    // std::cout << "SubGraph::SubGraph --2--\n";
+    // std::cout << std::boolalpha << "graph_created_ = " << graph_created_ << '\n';
+    // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+>>>>>>> Add base CudaGraph support
     initExecuteSequence(context, false, false);
 }
 
@@ -135,12 +154,30 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
     auto& cancellationToken = context.getCancellationToken();
     auto& profiler = context.getProfiler();
     profiler.set_stream(stream);
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "SubGraph::Execute\n";
+    // std::cout << std::boolalpha << "graph_created_ = " << graph_created_ << '\n';
+    if (!graph_created_) {
+        // std::cout << "cudaStreamBeginCapture...\n";
+        throwIfError(cudaStreamBeginCapture(stream.get(), cudaStreamCaptureModeGlobal));
     for (auto& op : profiler.create_exec_sequence(this)) {
-        auto inputTensors = memoryManager.inputTensorPointers(*op, mutableBuffer);
-        auto outputTensors = memoryManager.outputTensorPointers(*op, mutableBuffer);
-        auto workBuffers = memoryManager.workBuffers(*op, mutableBuffer);
-        op->execute(context, inputTensors, outputTensors, workBuffers);
+            cancellationToken.Check();
+            auto inputTensors = memoryManager.inputTensorPointers(*op, mutableBuffer);
+            auto outputTensors = memoryManager.outputTensorPointers(*op, mutableBuffer);
+            auto workBuffers = memoryManager.workBuffers(*op, mutableBuffer);
+            op->execute(context, inputTensors, outputTensors, workBuffers);
+        }
+        // std::cout << "cudaStreamEndCapture...\n";
+        throwIfError(cudaStreamEndCapture(stream.get(), &graph_));
+        // std::cout << "cudaGraphInstantiate...\n";
+        throwIfError(cudaGraphInstantiate(&instance_, graph_, NULL, NULL, 0));
+        graph_created_ = true;
     }
+    // std::cout << "cudaGraphLaunch...\n";
+    throwIfError(cudaGraphLaunch(instance_, stream.get()));
+    // std::cout << "cudaStreamSynchronize...\n";
+    throwIfError(cudaStreamSynchronize(stream.get()));
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 bool SubGraph::IsCudaGraphCompatible() const {
