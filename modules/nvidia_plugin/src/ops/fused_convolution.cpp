@@ -72,7 +72,8 @@ OperationBase::Ptr fusedConvolutionFactory(const CreationContext& context,
     // For more information see:
     // https://docs.nvidia.com/deeplearning/cudnn/api/index.html#cudnnConvolutionBiasActivationForward
     const bool should_decompose = params.activation_ == ov::nvidia_gpu::nodes::ActivationMode::NO_ACTIVATION &&
-                                  conv_descs->Algo().algo != CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM;
+                                  (conv_descs->Algo().algo != CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM ||
+                                   conv_descs->ElementType() == CUDNN_DATA_HALF);
 
     if (should_decompose) {
         try {

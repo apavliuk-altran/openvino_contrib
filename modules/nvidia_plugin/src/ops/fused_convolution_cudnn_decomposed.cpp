@@ -103,8 +103,10 @@ void FusedConvolutionCuDnnDecomposed::ThrowIfShouldNotDecompose() const {
     cudnnNanPropagation_t prop;
     double coef;
     throwIfError(::cudnnGetActivationDescriptor(activation_desc_->get(), &mode, &prop, &coef));
-    if (mode != CUDNN_ACTIVATION_IDENTITY ||
-        conv_descs_->Algo().algo == CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM) {
+    const bool should_decompose = mode == CUDNN_ACTIVATION_IDENTITY &&
+                                  (conv_descs_->Algo().algo != CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM ||
+                                   conv_descs_->ElementType() == CUDNN_DATA_HALF);
+    if (!should_decompose) {
         throwIEException(
             "ov::nvidia_gpu::FusedConvolutionCuDnnDecomposed: FusedConvolutionCuDnnDecomposed should only be used for "
             "CUDNN_ACTIVATION_IDENTITY and an algo other than CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM");
