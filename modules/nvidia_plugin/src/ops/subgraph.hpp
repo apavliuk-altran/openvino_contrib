@@ -40,6 +40,10 @@ private:
     static std::unique_ptr<MemoryManager> createMemoryManager(const OperationBuffersExtractor& opBuffersExtractor);
     std::vector<DevicePointer<void*>> getSharedWorkbuffers(const IOperationExec& operation);
 
+    mutable bool graph_created_;
+    mutable cudaGraph_t graph_;
+    mutable cudaGraphExec_t instance_;
+
 protected:
     using SubGraphOp = ov::op::util::SubGraphOp;
 
