@@ -97,6 +97,7 @@ ConvolutionDescriptorsCuDnn::ConvolutionDescriptorsCuDnn(const CreationContext& 
     } else {
         GetAlgo(dnnHandle);
     }
+    throwIfError(::cudnnSetConvolutionMathType(conv_.get(), algo_perf_.mathType));
 }
 
 void ConvolutionDescriptorsCuDnn::BenchmarkOptimalAlgo(const CUDA::DnnHandle& dnnHandle,
