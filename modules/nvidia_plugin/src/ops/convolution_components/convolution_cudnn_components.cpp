@@ -48,17 +48,20 @@ ConvolutionParamsCuDnn::ConvolutionParamsCuDnn(const Convolution::Details::Convo
 
 CUDA::DnnTensorDescriptor ConvolutionParamsCuDnn::MakeInputDescriptor() const {
     return CUDA::DnnTensorDescriptor{}.set(
-        cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, data_type_, number_of_dims_, input_shape_.data());
+        // cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, data_type_, number_of_dims_, input_shape_.data());
+        cudnnTensorFormat_t::CUDNN_TENSOR_NHWC, data_type_, number_of_dims_, input_shape_.data());
 }
 
 CUDA::DnnFilterDescriptor ConvolutionParamsCuDnn::MakeFilterDescriptor() const {
     return CUDA::DnnFilterDescriptor{}.set(
-        data_type_, cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, number_of_dims_, filter_shape_.data());
+        // data_type_, cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, number_of_dims_, filter_shape_.data());
+        data_type_, cudnnTensorFormat_t::CUDNN_TENSOR_NHWC, number_of_dims_, filter_shape_.data());
 }
 
 CUDA::DnnTensorDescriptor ConvolutionParamsCuDnn::MakeOutputDescriptor() const {
     return CUDA::DnnTensorDescriptor{}.set(
-        cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, data_type_, number_of_dims_, output_shape_.data());
+        // cudnnTensorFormat_t::CUDNN_TENSOR_NCHW, data_type_, number_of_dims_, output_shape_.data());
+        cudnnTensorFormat_t::CUDNN_TENSOR_NHWC, data_type_, number_of_dims_, output_shape_.data());
 }
 
 CUDA::DnnConvolutionDescriptor ConvolutionParamsCuDnn::MakeConvolutionDescriptor(cudnnDataType_t convDataType) const {
@@ -489,7 +492,8 @@ std::shared_ptr<CUDA::DnnTensorDescriptor> MakeFusedAddDescriptor(const ov::Shap
     std::array<int, CUDNN_DIM_MAX> int_shape;
     std::copy(shape.begin(), shape.end(), int_shape.begin());
     auto desc = std::make_shared<CUDA::DnnTensorDescriptor>();
-    desc->set(cudnnTensorFormat_t::CUDNN_TENSOR_NCHW,
+    // desc->set(cudnnTensorFormat_t::CUDNN_TENSOR_NCHW,
+    desc->set(cudnnTensorFormat_t::CUDNN_TENSOR_NHWC,
               convertDataType<cudnnDataType_t>(element_type),
               static_cast<int>(shape.size()),
               int_shape.data());
