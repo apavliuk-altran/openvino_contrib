@@ -171,7 +171,7 @@ void GraphTransformer::cuda_transform(const CUDA::Device& device,
 
     manager.register_pass<ov::nvidia_gpu::pass::ConvolutionAsymPaddingTransformation>();
     manager.register_pass<ov::nvidia_gpu::pass::GroupConvolutionAsymPaddingTransformation>();
-    manager.register_pass<ov::nvidia_gpu::pass::CudaConvolutionFusion>();
+    // manager.register_pass<ov::nvidia_gpu::pass::CudaConvolutionFusion>();
     manager.register_pass<ov::nvidia_gpu::pass::ConvolutionBackpropDataAsymPaddingTransformation>();
     manager.register_pass<ov::nvidia_gpu::pass::GroupConvolutionBackpropDataAsymPaddingTransformation>();
     manager.register_pass<ov::nvidia_gpu::pass::FusedConvBackpropDataAsymPaddingTransformation>();
