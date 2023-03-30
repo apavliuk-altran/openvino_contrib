@@ -138,7 +138,15 @@ WorkbufferRequest SubGraph::GetWorkBufferRequest() const {
     return {{}, {memoryBlockSize}};
 }
 
-void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, const Workbuffers& workbuffers) const {
+SubGraph::~SubGraph() {
+    if (graph_created_) {
+        throwIfError(cudaGraphExecDestroy(instance_));
+        throwIfError(cudaGraphDestroy(graph_));
+    }
+}
+
+// void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, const Workbuffers& workbuffers) const {
+void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, const Workbuffers& workbuffers) {
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
@@ -151,6 +159,7 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
     // std::cout << std::boolalpha << "graph_created_ = " << graph_created_ << '\n';
     if (!graph_created_) {
         // std::cout << "cudaStreamBeginCapture...\n";
+        throwIfError(cudaGraphCreate(&graph_, 0));
         throwIfError(cudaStreamBeginCapture(stream.get(), cudaStreamCaptureModeGlobal));
         for (auto& op : profiler.CreateExecSequence(this)) {
             cancellationToken.Check();
@@ -161,14 +170,21 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
         }
         // std::cout << "cudaStreamEndCapture...\n";
         throwIfError(cudaStreamEndCapture(stream.get(), &graph_));
+        std::cout << "captured stream:    \t" << stream.get() << '\n';
         // std::cout << "cudaGraphInstantiate...\n";
         throwIfError(cudaGraphInstantiate(&instance_, graph_, NULL, NULL, 0));
         graph_created_ = true;
     }
     // std::cout << "cudaGraphLaunch...\n";
+    std::cout << "launching on stream:\t" << stream.get() << '\n';
     throwIfError(cudaGraphLaunch(instance_, stream.get()));
     // std::cout << "cudaStreamSynchronize...\n";
     throwIfError(cudaStreamSynchronize(stream.get()));
+
+
+    throwIfError(cudaDeviceSynchronize());
+
+
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 

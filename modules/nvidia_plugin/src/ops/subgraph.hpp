@@ -21,10 +21,16 @@ public:
 
     virtual ~SubGraph() = 0;
 
+
     void Execute(const InferenceRequestContext& context,
                  Inputs inputTensors,
                  Outputs outputTensors,
-                 const Workbuffers& workbuffers) const override;
+                 const Workbuffers& workbuffers) const override {}
+
+    void Execute(const InferenceRequestContext& context,
+                 Inputs inputTensors,
+                 Outputs outputTensors,
+                 const Workbuffers& workbuffers);
 
     bool IsCudaGraphCompatible() const override;
 
@@ -77,8 +83,6 @@ protected:
     std::vector<OperationInfo> results_info_;
     std::shared_ptr<const ngraph::Function> function_;
 };
-
-inline SubGraph::~SubGraph() {}
 
 inline const std::vector<OperationBase::Ptr>& SubGraph::getExecSequence() const { return exec_sequence_; }
 
