@@ -18,7 +18,8 @@ public:
     ExecGraph(const CreationContext& context, const std::shared_ptr<const ngraph::Function>& function);
     ~ExecGraph() override = default;
 
-    void Run(const InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const;
+    // void Run(const InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const;
+    void Run(const InferenceRequestContext& context, const DeviceMemBlock& memoryBlock);
 };
 
 }  // namespace nvidia_gpu
