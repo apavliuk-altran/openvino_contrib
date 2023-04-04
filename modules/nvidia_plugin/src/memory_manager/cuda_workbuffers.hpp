@@ -44,6 +44,20 @@ struct Workbuffers {
     }
 };
 
+inline std::ostream& operator<<(std::ostream& s, const Workbuffers& wb) {
+    auto toString = [](const void* p) {
+        std::stringstream ss;
+        ss << p;
+        return ss.str();
+    };
+    s << "Workbuffers: "
+        << "\timmutable_buffers: " << (wb.immutable_buffers.size() != 0 ? toString(wb.immutable_buffers[0].get()) : "empty")
+        << "\tmutable_buffers: " << (wb.mutable_buffers.size() != 0 ? toString(wb.mutable_buffers[0].get()) : "empty")
+        << '\n';
+    return s;
+}
+
+
 /**
  * @brief WorkbufferIds - structure holding the memory buffers' indices
  */

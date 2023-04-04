@@ -30,7 +30,12 @@ void ParameterOp::Execute(const InferenceRequestContext& context,
     OPENVINO_ASSERT(context.HasInputBlob(input_tensor_name_), "Node name: ", GetName());
     auto blob = context.GetInputBlob(input_tensor_name_);
     auto memory_ptr = std::static_pointer_cast<ngraph::HostTensor>(blob)->get_data_ptr();
+    // std::cout << "=================================================================================\n";
+    // std::cout << "ParameterOp::Execute\n";
+    // std::cout << "memory_ptr: " << memory_ptr << '\n';
+    // std::cout << "outputs[0]: " << outputs[0].get() << '\n';
     context.getThreadContext().stream().upload(outputs[0], memory_ptr, blob->get_size_in_bytes());
+    // std::cout << "=================================================================================\n";
 }
 
 bool ParameterOp::IsCudaGraphCompatible() const { return true; }

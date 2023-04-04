@@ -156,9 +156,11 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
     profiler.SetStream(stream);
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
     // std::cout << "SubGraph::Execute\n";
-    // std::cout << std::boolalpha << "graph_created_ = " << graph_created_ << '\n';
+
+    // std::cout << memoryManager;
+    // std::cout << workbuffers;
+
     if (!graph_created_) {
-        // std::cout << "cudaStreamBeginCapture...\n";
         throwIfError(cudaGraphCreate(&graph_, 0));
         throwIfError(cudaStreamBeginCapture(stream.get(), cudaStreamCaptureModeGlobal));
         for (auto& op : profiler.CreateExecSequence(this)) {
@@ -168,21 +170,17 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
             auto workBuffers = memoryManager.workBuffers(*op, mutableBuffer);
             op->Execute(context, inputTensors, outputTensors, workBuffers);
         }
-        // std::cout << "cudaStreamEndCapture...\n";
         throwIfError(cudaStreamEndCapture(stream.get(), &graph_));
-        std::cout << "captured stream:    \t" << stream.get() << '\n';
-        // std::cout << "cudaGraphInstantiate...\n";
+        // std::cout << "captured stream:    \t" << stream.get() << '\n';
         throwIfError(cudaGraphInstantiate(&instance_, graph_, NULL, NULL, 0));
         graph_created_ = true;
     }
-    // std::cout << "cudaGraphLaunch...\n";
-    std::cout << "launching on stream:\t" << stream.get() << '\n';
+    // std::cout << "launching on stream:\t" << stream.get() << '\n';
     throwIfError(cudaGraphLaunch(instance_, stream.get()));
-    // std::cout << "cudaStreamSynchronize...\n";
-    throwIfError(cudaStreamSynchronize(stream.get()));
+    // throwIfError(cudaStreamSynchronize(stream.get()));
 
 
-    throwIfError(cudaDeviceSynchronize());
+    // throwIfError(cudaDeviceSynchronize());
 
 
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
