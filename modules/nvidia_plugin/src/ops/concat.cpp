@@ -88,11 +88,23 @@ void ConcatOp::Execute(const InferenceRequestContext& context,
     OPENVINO_ASSERT(workbuffers.immutable_buffers.size() == 1, "Node name: ", GetName());
     OPENVINO_ASSERT(workbuffers.mutable_buffers.size() == 1, "Node name: ", GetName());
 
+    std::cout << "```````````````````````````````````````````````````````````````````````````````````````\n";
+    std::cout << "ConcatOp::Execute\n";
+    std::cout << "stream:\t\t\t\t\t" << stream.get() << '\n';
+
+    std::cout << "workbuffers.mutable_buffers[0]:\t\t" << workbuffers.mutable_buffers[0].get() << '\n';
+    std::cout << "inputs.data():\t\t\t\t" << inputs.data() << '\n';
+    std::cout << "mutableWbSize():\t\t\t" << mutableWbSize() << '\n';
+    std::cout << "workbuffers.immutable_buffers[0]:\t" << workbuffers.immutable_buffers[0].get() << '\n';
+    std::cout << "outputs[0]:\t\t\t\t" << outputs[0].get() << '\n';
+
     stream.upload(workbuffers.mutable_buffers[0], inputs.data(), mutableWbSize());
     (*concat_kernel_)(stream.get(),
                       workbuffers.immutable_buffers[0].get(),
                       reinterpret_cast<const void* const*>(workbuffers.mutable_buffers[0].get()),
                       outputs[0].get());
+
+    std::cout << "```````````````````````````````````````````````````````````````````````````````````````\n";
 }
 
 OPERATION_REGISTER(ConcatOp, Concat);

@@ -98,5 +98,18 @@ private:
     DeviceMemBlock::Ptr immutable_workbuffers_;
 };
 
+inline std::ostream& operator<<(std::ostream& s, const MemoryManager& mm) {
+    auto toString = [](const void* p) {
+        std::stringstream ss;
+        ss << p;
+        return ss.str();
+    };
+    s << "MemoryManager: "
+        << "\timmutable_tensors_: " << toString(mm.immutableTensors().view().data())
+        << "\timmutable_workbuffers_: " << toString(mm.immutableWorkbuffers().view().data())
+        << '\n';
+    return s;
+}
+
 }  // namespace nvidia_gpu
 }  // namespace ov

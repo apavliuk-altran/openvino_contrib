@@ -24,7 +24,7 @@ std::vector<std::vector<std::vector<size_t>>> inShapes = {
 std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
                                                          InferenceEngine::Precision::FP16};
 
-INSTANTIATE_TEST_CASE_P(smoke_NoReshape,
+INSTANTIATE_TEST_CASE_P(smoke_Concat,
                         ConcatLayerTest,
                         ::testing::Combine(::testing::ValuesIn(axes),
                                            ::testing::ValuesIn(inShapes),
@@ -36,4 +36,15 @@ INSTANTIATE_TEST_CASE_P(smoke_NoReshape,
                                            ::testing::Values(CommonTestUtils::DEVICE_NVIDIA)),
                         ConcatLayerTest::getTestCaseName);
 
+INSTANTIATE_TEST_CASE_P(smoke_ConcatOptimized,
+                        ConcatLayerTest,
+                        ::testing::Combine(::testing::Values(0),
+                                           ::testing::Values(inShapes[0]),
+                                           ::testing::ValuesIn(netPrecisions),
+                                           ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
+                                           ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),
+                                           ::testing::Values(InferenceEngine::Layout::ANY),
+                                           ::testing::Values(InferenceEngine::Layout::ANY),
+                                           ::testing::Values(CommonTestUtils::DEVICE_NVIDIA)),
+                        ConcatLayerTest::getTestCaseName);
 }  // namespace
