@@ -38,7 +38,10 @@ bool change_concat_to_concat_optimized(Matcher& m) {
     }
 
     const auto& outputShape = concat->get_output_shape(0);
-    const int64_t axis = concat->get_axis();
+    int64_t axis = concat->get_axis();
+    if (axis < 0) {
+        axis += static_cast<int64_t>(concat->get_input_partial_shape(0).rank().get_length());
+    }
     if (axis < 0 || axis >= outputShape.size()) {
         return false;
     }

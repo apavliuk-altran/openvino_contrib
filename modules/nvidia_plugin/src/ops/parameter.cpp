@@ -28,7 +28,13 @@ void ParameterOp::Execute(const InferenceRequestContext& context,
     OPENVINO_ASSERT(outputs.size() == 1, "Node name: ", GetName());
     OPENVINO_ASSERT(context.has_input_tensor(input_tensor_name_), "Node name: ", GetName());
     auto tensor = context.get_input_tensor(input_tensor_name_);
-    context.getThreadContext().stream().upload(outputs[0], tensor->data(), tensor->get_byte_size());
+    auto memory_ptr = tensor->data();
+    // std::cout << "=================================================================================\n";
+    // std::cout << "ParameterOp::Execute\n";
+    // std::cout << "memory_ptr: " << memory_ptr << '\n';
+    // std::cout << "outputs[0]: " << outputs[0].get() << '\n';
+    context.getThreadContext().stream().upload(outputs[0], memory_ptr, tensor->get_byte_size());
+    // std::cout << "=================================================================================\n";
 }
 
 bool ParameterOp::IsCudaGraphCompatible() const { return true; }
