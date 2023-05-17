@@ -145,5 +145,14 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
     }
 }
 
+bool SubGraph::IsCudaGraphCompatible() const {
+    for (const auto& op : exec_sequence_) {
+        if (!op->IsCudaGraphCompatible()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 }  // namespace nvidia_gpu
 }  // namespace ov

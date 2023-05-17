@@ -33,6 +33,8 @@ public:
                  Outputs outputTensors,
                  const Workbuffers&) const override;
 
+    bool IsCudaGraphCompatible() const override;
+
 private:
     static Config config();
     void InitSharedImmutableWorkbuffers(const IOperationExec::Buffers&) override;
@@ -48,6 +50,8 @@ private:
     WorkbufferDesc ib_seq_lengths_;
     WorkbufferDesc ib_weight_space_;
     WorkbufferDesc mb_work_space_;
+
+    bool is_cuda_graph_compatible_;
 };
 
 }  // namespace nvidia_gpu

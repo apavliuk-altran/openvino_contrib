@@ -28,7 +28,10 @@ public:
                  Inputs inputTensors,
                  Outputs outputTensors,
                  const Workbuffers&) const override;
+
     WorkbufferRequest GetWorkBufferRequest() const override;
+
+    bool IsCudaGraphCompatible() const override;
 
 private:
     Convolution::Details::ConvolutionDescriptorsCuDnn descs_;

@@ -21,6 +21,8 @@ public:
                    IndexCollection&& inputIds,
                    IndexCollection&& outputIds);
 
+    bool IsCudaGraphCompatible() const override;
+
 private:
     void Execute(const InferenceRequestContext& context,
                  Inputs inputTensors,
