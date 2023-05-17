@@ -75,6 +75,8 @@ void LSTMSequenceOpBase::Execute(const InferenceRequestContext& context,
     if (cy_adapter) cy_adapter->execute(context, mb, outputs[ArgIndices::cell_output]);
 }
 
+bool LSTMSequenceOpBase::IsCudaGraphCompatible() const { return true; }
+
 void LSTMSequenceOpBase::InitSharedImmutableWorkbuffers(const IOperationExec::Buffers& buffers) {
     descs_.initDevSeqLengthArray(CUDA::DevicePointer<void*>{ib_seq_lengths_.requiredPtr(buffers)});
     descs_.initWeightSpace(CUDA::DevicePointer<void*>{ib_weight_space_.requiredPtr(buffers)});

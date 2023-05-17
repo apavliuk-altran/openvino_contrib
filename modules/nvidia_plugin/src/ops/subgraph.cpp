@@ -145,5 +145,7 @@ void SubGraph::Execute(const InferenceRequestContext& context, Inputs, Outputs, 
     }
 }
 
+bool SubGraph::IsCudaGraphCompatible() const { return true; }
+
 }  // namespace nvidia_gpu
 }  // namespace ov

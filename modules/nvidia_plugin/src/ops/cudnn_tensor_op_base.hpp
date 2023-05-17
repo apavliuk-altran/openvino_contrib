@@ -25,6 +25,8 @@ public:
                  Outputs outputTensors,
                  const Workbuffers& workbuffers) const override;
 
+    bool IsCudaGraphCompatible() const override;
+
 private:
     struct IoParams {
         const cudnnDataType_t type_;

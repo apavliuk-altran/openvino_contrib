@@ -70,6 +70,8 @@ void GRUSequenceOp::Execute(const InferenceRequestContext& context,
                          nullptr);
 }
 
+bool GRUSequenceOp::IsCudaGraphCompatible() const { return true; }
+
 void GRUSequenceOp::InitSharedImmutableWorkbuffers(const IOperationExec::Buffers& buffers) {
     descs_.initDevSeqLengthArray(CUDA::DevicePointer<void*>{ib_seq_lengths_.requiredPtr(buffers)});
     descs_.initWeightSpace(CUDA::DevicePointer<void*>{ib_weight_space_.requiredPtr(buffers)});

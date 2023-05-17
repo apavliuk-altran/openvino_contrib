@@ -33,6 +33,8 @@ public:
                  Outputs outputTensors,
                  const Workbuffers&) const override;
 
+    bool IsCudaGraphCompatible() const override;
+
 private:
     static Config config();
     void InitSharedImmutableWorkbuffers(const IOperationExec::Buffers&) override;
