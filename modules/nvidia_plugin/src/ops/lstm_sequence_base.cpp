@@ -49,7 +49,23 @@ void LSTMSequenceOpBase::Execute(const InferenceRequestContext& context,
     void* const api_hy = hy_adapter ? hy_adapter->dnnApiPtr(mb) : outputs[ArgIndices::hidden_output].get();
     void* const api_cy = cy_adapter ? cy_adapter->dnnApiPtr(mb) : outputs[ArgIndices::cell_output].get();
 
+
     const auto& dnnHandle = context.getThreadContext().dnnHandle();
+
+    
+    cudnnActivationDescriptor_t ad;
+    throwIfError(::cudnnCreateActivationDescriptor(&ad));
+    throwIfError(::cudnnDestroyActivationDescriptor(ad));
+    ad = nullptr;
+
+    std::vector<float> v(32);
+    auto stream = context.getThreadContext().stream();
+    std::cout << "===========================================================================\n";
+    std::cout << "v.size() = " << v.size() << '\n';
+    std::cout << "===========================================================================\n";
+    CUDA::Allocation al = stream.malloc(v.size() * sizeof(float));
+    stream.upload(al, v.data(), v.size() * sizeof(float));
+
     dnnHandle.rnnForward(descs_.rnnDesc(),
                          descs_.dnnForwardMode(),
                          static_cast<const int32_t*>(ib_seq_lengths_.requiredPtr(ib)),

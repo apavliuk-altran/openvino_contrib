@@ -14,8 +14,8 @@ void ExecGraph::Run(const InferenceRequestContext& context, const DeviceMemBlock
     Workbuffers workbuffers{};
     workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
     SubGraph::Execute(context, {}, {}, workbuffers);
-    SubGraph::Execute(context, {}, {}, workbuffers);
-    SubGraph::Execute(context, {}, {}, workbuffers);
+    // SubGraph::Execute(context, {}, {}, workbuffers);
+    // SubGraph::Execute(context, {}, {}, workbuffers);
 }
 
 }  // namespace nvidia_gpu

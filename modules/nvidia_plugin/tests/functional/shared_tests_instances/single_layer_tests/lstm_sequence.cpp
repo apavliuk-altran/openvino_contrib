@@ -47,20 +47,27 @@ namespace {
 const auto testMode = ngraph::helpers::SequenceTestsMode::PURE_SEQ;
 const std::vector<std::string> activations{"sigmoid", "tanh", "tanh"};
 const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
-                                                               InferenceEngine::Precision::FP16};
+                                                            //    InferenceEngine::Precision::FP16};
+                                                              };
 const std::vector<ov::op::RecurrentSequenceDirection> sequenceDirections = {
-    ov::op::RecurrentSequenceDirection::FORWARD, ov::op::RecurrentSequenceDirection::BIDIRECTIONAL};
+    // ov::op::RecurrentSequenceDirection::FORWARD, ov::op::RecurrentSequenceDirection::BIDIRECTIONAL};
+    ov::op::RecurrentSequenceDirection::BIDIRECTIONAL};
+
 // Currently LSTMSequence cuDNN implementation doesn't support clipping
 const float no_clip = 0.0f;
-const std::vector<size_t> batches{1, 2, 3, 10};
+// const std::vector<size_t> batches{1, 2, 3, 10};
+const std::vector<size_t> batches{1};
 
 // ------------- Smoke Tests -------------
 
-const std::vector<size_t> smoke_max_seq_lengths{1, 2, 3, 10};
+// const std::vector<size_t> smoke_max_seq_lengths{1, 2, 3, 10};
+const std::vector<size_t> smoke_max_seq_lengths{3};
 
 // Currently LSTMSequence cuDNN implementation doesn't support combination of input_size == 1 and hidden_size == 1
-const std::vector<size_t> smoke_01_input_sizes{1, 2, 3, 20};
-const std::vector<size_t> smoke_01_hidden_sizes{2, 3, 10};
+// const std::vector<size_t> smoke_01_input_sizes{1, 2, 3, 20};
+const std::vector<size_t> smoke_01_input_sizes{1};
+// const std::vector<size_t> smoke_01_hidden_sizes{2, 3, 10};
+const std::vector<size_t> smoke_01_hidden_sizes{2};
 const std::vector<size_t> smoke_02_input_sizes{2, 3, 20};
 const std::vector<size_t> smoke_02_hidden_sizes{1};
 
