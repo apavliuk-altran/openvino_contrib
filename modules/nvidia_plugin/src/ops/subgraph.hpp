@@ -20,12 +20,13 @@ public:
     void Execute(const InferenceRequestContext& context,
                  Inputs inputTensors,
                  Outputs outputTensors,
-                 const Workbuffers& workbuffers) const override {}
+                //  const Workbuffers& workbuffers) const override {}
+                 const Workbuffers& workbuffers) const override;
 
-    void Execute(const InferenceRequestContext& context,
-                 Inputs inputTensors,
-                 Outputs outputTensors,
-                 const Workbuffers& workbuffers);
+    // void Execute(const InferenceRequestContext& context,
+    //              Inputs inputTensors,
+    //              Outputs outputTensors,
+    //              const Workbuffers& workbuffers);
 
     bool IsCudaGraphCompatible() const override;
 
