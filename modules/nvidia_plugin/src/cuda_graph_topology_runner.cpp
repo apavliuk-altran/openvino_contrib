@@ -30,7 +30,9 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext &context,
         workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
         SubGraph::Capture(context, {}, {}, workbuffers);
     }
-    context.getCudaGraphContext().graphExec_.emplace(capture.getGraph());
+    const auto& graph = capture.getGraph();
+    context.getCudaGraphContext().graph.emplace(graph);
+    context.getCudaGraphContext().graphExec_.emplace(graph);
 }
 
 const SubGraph& CudaGraphTopologyRunner::GetSubGraph() const {
