@@ -23,6 +23,13 @@
 #include "cuda_plugin.hpp"
 #include "nvidia/properties.hpp"
 
+
+
+#include <fstream>;
+
+
+
+
 namespace ov {
 namespace nvidia_gpu {
 using namespace utils;
@@ -37,6 +44,69 @@ void allocate_tensor_impl(ov::Tensor& tensor, const ov::element::Type& element_t
         tensor.set_shape(shape);
     }
 }
+
+constexpr bool TO_DUMP = true;
+// constexpr bool TO_DUMP = false;
+
+// constexpr float THRESHOLD = 0.5f;
+constexpr float THRESHOLD = 2.0f;
+
+template <typename T>
+void dumpTensor_t(std::ofstream& f, const ov::Tensor& t) {
+    const auto* ptr = static_cast<const T*>(t.data());
+    for (size_t i = 0; i < t.get_size(); ++i){
+        f << static_cast<float>(ptr[i]) << ' ';
+    }
+    f << '\n';
+}
+
+void dumpTensor(const std::string& fileName, const ov::Tensor& t) {
+    std::ofstream f;
+    f.open(fileName, std::ios::trunc);
+    const auto& type = t.get_element_type();
+    if (type == ov::element::Type_t::f32) {
+        dumpTensor_t<float>(f, t);
+    } else if (type == ov::element::Type_t::u8) {
+        dumpTensor_t<uint8_t>(f, t);
+    } else {
+        throw std::runtime_error("Unsupported type: " + type.get_type_name());
+    }
+    f.close();
+}
+
+template <typename T>
+void validateTensor_t(std::ifstream& f, const ov::Tensor& t, float threshold) {
+    const auto* ptr = static_cast<const T*>(t.data());
+    std::cout << "ptr = " << static_cast<const void*>(ptr) << '\n';
+    float ref;
+    for (size_t i = 0; i < t.get_size(); ++i){
+        const auto act = static_cast<float>(ptr[i]);
+        f >> ref;
+        const float diff = std::abs(act - ref);
+        if (diff > threshold) {
+            std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+            std::cout << "i = " << i << ", diff = " << diff << " is greater than threshold = " << threshold
+                      << ": act = " << act << ", ref = " << ref << '\n';
+            std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+            throw std::runtime_error{"diff > threshold"};
+        }
+    }
+}
+
+void validateTensor(const std::string& fileName, const ov::Tensor& t, float threshold = THRESHOLD) {
+    std::ifstream f;
+    f.open(fileName, std::ios::in);
+    const auto& type = t.get_element_type();
+    if (type == ov::element::Type_t::f32) {
+        validateTensor_t<float>(f, t, threshold);
+    } else if (type == ov::element::Type_t::u8) {
+        validateTensor_t<uint8_t>(f, t, threshold);
+    } else {
+        throw std::runtime_error("Unsupported type: " + type.get_type_name());
+    }
+    f.close();
+}
+
 }  // namespace
 
 CudaInferRequest::CudaInferRequest(const std::shared_ptr<const CompiledModel>& compiled_model, bool use_cuda_graph)
@@ -137,6 +207,21 @@ void CudaInferRequest::infer_preprocess() {
 }
 
 void CudaInferRequest::start_pipeline(const ThreadContext& threadContext) {
+    std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+    std::cout << "Dumping inputs, thread #" << std::this_thread::get_id() << '\n';
+
+    for (size_t i = 0; i < input_tensors_.size(); i++) {
+        std::string fName = std::string{"ref_input0"} + std::to_string(i) + ".txt";
+        const auto& t = input_tensors_.at(i);
+        if (TO_DUMP) {
+            dumpTensor(fName, *t);
+        } else {
+            validateTensor(fName, *t);
+        }
+    }
+
+    std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+
     try {
         OV_ITT_SCOPED_TASK(itt::domains::nvidia_gpu, _profilingTask[Profiler::StartPipeline])
         profiler_.start_stage();
@@ -178,6 +263,22 @@ void CudaInferRequest::wait_pipeline(const ThreadContext& threadContext) {
     threadContext.stream().synchronize();
     memory_proxy_.reset();
     profiler_.stop_stage(Profiler::WaitPipeline);
+    std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+    std::cout << "Dumping outputs, thread #" << std::this_thread::get_id() << '\n';
+
+    for (size_t i = 0; i < get_outputs().size(); i++) {
+        auto host_tensor = *output_tensors_[i].get();
+
+        const std::string fName = std::string{"ref_output0"} + std::to_string(i) + ".txt";
+        if (TO_DUMP) {
+            dumpTensor(fName, host_tensor);
+        } else {
+            validateTensor(fName, host_tensor);
+        }
+
+    }
+
+    std::cout  << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
 }
 
 void CudaInferRequest::infer_postprocess() {

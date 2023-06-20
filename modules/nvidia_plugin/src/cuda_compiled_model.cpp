@@ -140,65 +140,73 @@ void CompiledModel::benchmark_optimal_number_of_requests() {
         return;
     }
 
-    struct BenchmarkResult {
-        unsigned numberOfInferRequests;
-        unsigned fps;
+    // struct BenchmarkResult {
+    //     unsigned numberOfInferRequests;
+    //     unsigned fps;
 
-        bool operator<(const BenchmarkResult& other) const { return other.fps < this->fps; }
-    };
+    //     bool operator<(const BenchmarkResult& other) const { return other.fps < this->fps; }
+    // };
 
-    auto start = Time::now();
+    // auto start = Time::now();
 
-    create_benchmark_infer_request()->infer();
+    // create_benchmark_infer_request()->infer();
 
-    auto numMemManagers = memory_pool_->Size();
-    std::mutex mtx;
-    std::condition_variable cond_var;
+    // auto numMemManagers = memory_pool_->Size();
 
-    constexpr auto kTimesBenchmarkRun = 3;
-    std::vector<BenchmarkResult> benchmarks;
-    benchmarks.reserve(numMemManagers);
-    for (unsigned numInfers = 1; numInfers <= numMemManagers; ++numInfers) {
-        std::array<unsigned, kTimesBenchmarkRun> allFps{};
-        std::for_each(allFps.begin(), allFps.end(), [this, &mtx, &cond_var, &numInfers](auto& fps) {
-            fps = run_benchmark_for(numInfers, mtx, cond_var);
-        });
-        const unsigned fps = std::accumulate(allFps.begin(), allFps.end(), 0) / allFps.size();
-        benchmarks.push_back({numInfers, fps});
-    }
-    std::sort(benchmarks.begin(), benchmarks.end(), std::less<>{});
 
-    constexpr auto kNumberBestThroughputs = 3;
-    std::vector<BenchmarkResult> optimalBenchmarks{};
-    optimalBenchmarks.reserve(kNumberBestThroughputs);
-    for (unsigned i = 0; i < kNumberBestThroughputs && i < benchmarks.size(); ++i) {
-        optimalBenchmarks.push_back(benchmarks[i]);
+    const auto numMemManagers = 10;
+
+    if (memory_pool_->Size() < numMemManagers) {
+        memory_pool_->Resize(numMemManagers);
     }
 
-    constexpr auto kMaxFpsRelativeDiff = 0.01;
-    const auto avgFps = std::accumulate(optimalBenchmarks.begin(),
-                                        optimalBenchmarks.end(),
-                                        0,
-                                        [](const auto init, const auto& z) { return init + z.fps; }) /
-                        optimalBenchmarks.size();
-    const auto maxFpsDiff = kMaxFpsRelativeDiff * avgFps;
+    // std::mutex mtx;
+    // std::condition_variable cond_var;
 
-    auto optimalBenchmarkResult = optimalBenchmarks[0];
-    for (auto& benchmark : optimalBenchmarks) {
-        if (std::fabs(optimalBenchmarkResult.fps - benchmark.fps) < maxFpsDiff &&
-            benchmark.numberOfInferRequests < optimalBenchmarkResult.numberOfInferRequests) {
-            optimalBenchmarkResult = benchmark;
-        }
-    }
+    // constexpr auto kTimesBenchmarkRun = 3;
+    // std::vector<BenchmarkResult> benchmarks;
+    // benchmarks.reserve(numMemManagers);
+    // for (unsigned numInfers = 1; numInfers <= numMemManagers; ++numInfers) {
+    //     std::array<unsigned, kTimesBenchmarkRun> allFps{};
+    //     std::for_each(allFps.begin(), allFps.end(), [this, &mtx, &cond_var, &numInfers](auto& fps) {
+    //         fps = run_benchmark_for(numInfers, mtx, cond_var);
+    //     });
+    //     const unsigned fps = std::accumulate(allFps.begin(), allFps.end(), 0) / allFps.size();
+    //     benchmarks.push_back({numInfers, fps});
+    // }
+    // std::sort(benchmarks.begin(), benchmarks.end(), std::less<>{});
+
+    // constexpr auto kNumberBestThroughputs = 3;
+    // std::vector<BenchmarkResult> optimalBenchmarks{};
+    // optimalBenchmarks.reserve(kNumberBestThroughputs);
+    // for (unsigned i = 0; i < kNumberBestThroughputs && i < benchmarks.size(); ++i) {
+    //     optimalBenchmarks.push_back(benchmarks[i]);
+    // }
+
+    // constexpr auto kMaxFpsRelativeDiff = 0.01;
+    // const auto avgFps = std::accumulate(optimalBenchmarks.begin(),
+    //                                     optimalBenchmarks.end(),
+    //                                     0,
+    //                                     [](const auto init, const auto& z) { return init + z.fps; }) /
+    //                     optimalBenchmarks.size();
+    // const auto maxFpsDiff = kMaxFpsRelativeDiff * avgFps;
+
+    // auto optimalBenchmarkResult = optimalBenchmarks[0];
+    // for (auto& benchmark : optimalBenchmarks) {
+    //     if (std::fabs(optimalBenchmarkResult.fps - benchmark.fps) < maxFpsDiff &&
+    //         benchmark.numberOfInferRequests < optimalBenchmarkResult.numberOfInferRequests) {
+    //         optimalBenchmarkResult = benchmark;
+    //     }
+    // }
     //fmt::print("Optimal number infer-requests = {}\n", optimalBenchmarkResult.numberOfInferRequests);
-    if (optimalBenchmarkResult.numberOfInferRequests < numMemManagers) {
-        memory_pool_->Resize(optimalBenchmarkResult.numberOfInferRequests);
+    // if (optimalBenchmarkResult.numberOfInferRequests < numMemManagers) {
+        // memory_pool_->Resize(optimalBenchmarkResult.numberOfInferRequests);
         //fmt::print(
         //    "Resize MemoryManagerPool from {} to {}\n", numMemManagers, optimalBenchmarkResult.numberOfInferRequests);
-    }
-    [[maybe_unused]] auto duration = Time::now() - start;
-    [[maybe_unused]] auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
-    //fmt::print("Time of benchmark for optimal number infer-requests = {} ms\n", durationMs.count());
+    // }
+    // [[maybe_unused]] auto duration = Time::now() - start;
+    // [[maybe_unused]] auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+    // //fmt::print("Time of benchmark for optimal number infer-requests = {} ms\n", durationMs.count());
 }
 
 unsigned int CompiledModel::run_benchmark_for(const int numInfers,
