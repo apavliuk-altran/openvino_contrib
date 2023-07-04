@@ -30,7 +30,7 @@ constexpr int SEED = 1;
 constexpr float THRESHOLD_BASE_FP32 = 1e-4f;
 constexpr float THRESHOLD_BASE_FP16 = 0.02f;
 
-class ConvolutionBiasAddActivationThresholdLayerTest : public AverageFinder<ConvolutionBiasAddActivationLayerTest> {
+class ConvolutionBiasAddActivationThresholdLayerTest : public MinMaxAvgFinder<ConvolutionBiasAddActivationLayerTest> {
 public:
     InferenceEngine::Blob::Ptr GenerateInput(const InferenceEngine::InputInfo& info) const override {
         return FuncTestUtils::createAndFillBlob(info.getTensorDesc(), RANGE, START_FROM, RESOLUTION, SEED);
@@ -42,15 +42,15 @@ protected:
 
         auto netPrecision = std::get<1>(std::get<0>(this->GetParam()));
         if (netPrecision == InferenceEngine::Precision::FP32) {
-            this->threshold_base = THRESHOLD_BASE_FP32;
+            // this->threshold_base = THRESHOLD_BASE_FP32;
         } else if (netPrecision == InferenceEngine::Precision::FP16) {
-            this->threshold_base = THRESHOLD_BASE_FP16;
+            // this->threshold_base = THRESHOLD_BASE_FP16;
         }
     }
 };
 
 class ConvolutionBiasAddAddActivationThresholdLayerTest
-    : public AverageFinder<ConvolutionBiasAddAddActivationLayerTest> {
+    : public MinMaxAvgFinder<ConvolutionBiasAddAddActivationLayerTest> {
 public:
     InferenceEngine::Blob::Ptr GenerateInput(const InferenceEngine::InputInfo& info) const override {
         return FuncTestUtils::createAndFillBlob(info.getTensorDesc(), RANGE, START_FROM, RESOLUTION, SEED);
@@ -62,9 +62,9 @@ protected:
 
         auto netPrecision = std::get<1>(std::get<0>(this->GetParam()));
         if (netPrecision == InferenceEngine::Precision::FP32) {
-            this->threshold_base = THRESHOLD_BASE_FP32;
+            // this->threshold_base = THRESHOLD_BASE_FP32;
         } else if (netPrecision == InferenceEngine::Precision::FP16) {
-            this->threshold_base = THRESHOLD_BASE_FP16;
+            // this->threshold_base = THRESHOLD_BASE_FP16;
         }
     }
 };
