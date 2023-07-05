@@ -74,7 +74,7 @@ CUDA::DnnConvolutionDescriptor ConvolutionParamsCuDnn::MakeConvolutionDescriptor
 
     // Enable computations on Tensor Core hardware which requires at least Volta GPU
     // (compute capability 7.0).
-    const cudnnMathType_t math_type = CUDNN_TENSOR_OP_MATH_ALLOW_CONVERSION;
+    const cudnnMathType_t math_type = CUDNN_TENSOR_OP_MATH;
     throwIfError(::cudnnSetConvolutionMathType(conv_desc.get(), math_type));
     throwIfError(::cudnnSetConvolutionGroupCount(conv_desc.get(), groups_));
 
@@ -96,6 +96,7 @@ ConvolutionDescriptorsCuDnn::ConvolutionDescriptorsCuDnn(const CreationContext& 
     } else {
         GetAlgo(dnnHandle);
     }
+    throwIfError(::cudnnSetConvolutionMathType(conv_.get(), algo_perf_.mathType));
 }
 
 void ConvolutionDescriptorsCuDnn::BenchmarkOptimalAlgo(const CUDA::DnnHandle& dnnHandle,
