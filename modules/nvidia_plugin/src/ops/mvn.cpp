@@ -45,9 +45,9 @@ MvnOp::MvnOp(const CreationContext& context,
       op_desc_type_{comp_type_ != CUDNN_DATA_DOUBLE ? CUDNN_DATA_FLOAT : CUDNN_DATA_DOUBLE},
       reduce_mean_desc_{op_desc_type_},
       sub_desc_(CUDA::DnnOpTensorDescriptor{}.set(
-          cudnnOpTensorOp_t::CUDNN_OP_TENSOR_ADD, op_desc_type_, cudnnNanPropagation_t::CUDNN_PROPAGATE_NAN)),
+          cudnnOpTensorOp_t::CUDNN_OP_TENSOR_ADD, op_desc_type_, cudnnNanPropagation_t::CUDNN_NOT_PROPAGATE_NAN)),
       mul_desc_(CUDA::DnnOpTensorDescriptor{}.set(
-          cudnnOpTensorOp_t::CUDNN_OP_TENSOR_MUL, op_desc_type_, cudnnNanPropagation_t::CUDNN_PROPAGATE_NAN)),
+          cudnnOpTensorOp_t::CUDNN_OP_TENSOR_MUL, op_desc_type_, cudnnNanPropagation_t::CUDNN_NOT_PROPAGATE_NAN)),
       tensor_desc_{CUDA::makeInputDnnTensorDescr(node, 0)},
       shape_{node.get_input_shape(0)},
       reduced_shape_{makeReducedShape(node)},

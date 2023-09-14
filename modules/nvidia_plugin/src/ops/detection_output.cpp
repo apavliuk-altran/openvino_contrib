@@ -16,6 +16,15 @@ DetectionOutputOp::DetectionOutputOp(const CreationContext& context,
                                      IndexCollection&& inputIds,
                                      IndexCollection&& outputIds)
     : OperationBase{context, node, move(inputIds), move(outputIds)}, element_type_{node.get_input_element_type(0)} {
+
+    std::cout << "*******************************************************************************************************\n";
+    std::cout << "*******************************************************************************************************\n";
+    for (size_t i = 0; i < node.inputs().size(); ++i) {
+        std::cout << "input " << i << ": " << node.get_input_element_type(i) << '\n';
+    }
+    std::cout << "*******************************************************************************************************\n";
+    std::cout << "*******************************************************************************************************\n";
+
     const auto& ngraph_attrs = node.get_attrs();
     kernel::DetectionOutput::Attrs kernel_attrs;
 

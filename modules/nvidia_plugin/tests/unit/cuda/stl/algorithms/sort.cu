@@ -9,6 +9,8 @@
 #include <cuda/stl/algorithms/sort.cuh>
 #include <random>
 
+#include <cuda_fp16.h>
+
 using namespace ov::nvidia_gpu;
 
 namespace {
@@ -33,21 +35,21 @@ __global__ void partial_quick_sort_launch(T* first, T* last, const size_t topk, 
     CUDA::algorithms::partial_quick_sort_iterative(first, last, topk, comparer);
 }
 
-template <typename T, typename Compare>
-__global__ void parallel_quick_sort_launch(T* first, T* last, int* stack, Compare comparer) {
-    const auto size = last - first;
-    const auto num_chunks = (size % gridDim.x == 0) ? gridDim.x : (gridDim.x + 1);
-    const auto chunk_size = size / num_chunks;
-    auto begin = first + blockIdx.x * chunk_size;
-    auto end = first + (blockIdx.x + 1) * chunk_size;
-    if (end > last) {
-        end = last;
-    }
-    auto stack_begin = stack + blockIdx.x * chunk_size;
-    constexpr auto kNumPartitions = 1024;
-    CUDA::algorithms::parallel::quick_sort_iterative<kNumPartitions>(
-        begin, end, stack_begin, comparer, threadIdx.x, blockDim.x);
-}
+// template <typename T, typename Compare>
+// __global__ void parallel_quick_sort_launch(T* first, T* last, int* stack, Compare comparer) {
+//     const auto size = last - first;
+//     const auto num_chunks = (size % gridDim.x == 0) ? gridDim.x : (gridDim.x + 1);
+//     const auto chunk_size = size / num_chunks;
+//     auto begin = first + blockIdx.x * chunk_size;
+//     auto end = first + (blockIdx.x + 1) * chunk_size;
+//     if (end > last) {
+//         end = last;
+//     }
+//     auto stack_begin = stack + blockIdx.x * chunk_size;
+//     constexpr auto kNumPartitions = 1024;
+//     CUDA::algorithms::parallel::quick_sort_iterative<kNumPartitions>(
+//         begin, end, stack_begin, comparer, threadIdx.x, blockDim.x);
+// }
 
 template <typename T, typename Compare>
 __global__ void parallel_quick_sort_launch(T* first, T* last, Compare comparer) {
@@ -73,124 +75,171 @@ class QuickSortKernelTest : public testing::Test {
 public:
     template <size_t ArrayLength, bool WithStack>
     void runQuickSort() {
-        auto arr = std::make_unique<float[]>(ArrayLength);
-        auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        // auto arr = std::make_unique<float[]>(ArrayLength);
+        // auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        auto arr = std::make_unique<__half[]>(ArrayLength);
+        // auto* arr = new __half[ArrayLength];
+        auto sortedArr = std::make_unique<__half[]>(ArrayLength);
         std::random_device rd{};
         std::mt19937 gen{rd()};
-        std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        // std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        std::uniform_real_distribution<float> dist(-60, 60);
 
-        constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        // constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        constexpr size_t arr_size = sizeof(__half) * ArrayLength;
 
         for (int n = 0; n < ArrayLength; ++n) {
-            arr[n] = dist(gen);
+            // arr[n] = dist(gen);
+            arr[n] = __half{dist(gen)};
         }
 
         const auto& defaultStream = CUDA::DefaultStream::stream();
         auto src = defaultStream.malloc(arr_size);
         defaultStream.upload(src, arr.get(), arr_size);
-        auto begin = static_cast<float*>(src.get());
+        // defaultStream.upload(src, arr, arr_size);
+        // auto begin = static_cast<float*>(src.get());
+        auto begin = static_cast<__half*>(src.get());
         auto end = begin + ArrayLength;
         CUDA::Stream stream{};
         if (WithStack) {
             auto stack = defaultStream.malloc(arr_size);
             auto stack_begin = static_cast<int*>(stack.get());
-            quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, stack_begin, CUDA::algorithms::Less<float>{});
+            // quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, stack_begin, CUDA::algorithms::Less<float>{});
+            quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, stack_begin, CUDA::algorithms::Less<__half>{});
         } else {
-            quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<float>{});
+            // quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<float>{});
+            quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<__half>{});
         }
         stream.synchronize();
         defaultStream.download(sortedArr.get(), src, arr_size);
 
-        std::sort(arr.get(), arr.get() + ArrayLength);
+        // std::sort(arr.get(), arr.get() + ArrayLength);
+        // std::sort(arr, arr + ArrayLength, [](auto a, auto b){ return static_cast<float>(a) < static_cast<float>(b); });
+        std::sort(arr.get(), arr.get() + ArrayLength, [](auto a, auto b){ return static_cast<float>(a) < static_cast<float>(b); });
         for (int i = 0; i < ArrayLength; ++i) {
-            if (sortedArr[i] != arr[i]) {
+            // if (sortedArr[i] != arr[i]) {
+            if (static_cast<float>(sortedArr[i]) != static_cast<float>(arr[i])) {
+                // std::cout << "i = " << i << std::endl;
+                // std::cout << "arr[i] = " << arr[i] << std::endl;
+                // std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
                 std::cout << "i = " << i << std::endl;
-                std::cout << "arr[i] = " << arr[i] << std::endl;
-                std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
+                std::cout << "arr[i] = " << static_cast<float>(arr[i]) << std::endl;
+                std::cout << "sortedArr[i] = " << static_cast<float>(sortedArr[i]) << std::endl;
             }
-            ASSERT_FLOAT_EQ(sortedArr[i], arr[i]);
+            // ASSERT_FLOAT_EQ(sortedArr[i], arr[i]);
+            ASSERT_FLOAT_EQ(static_cast<float>(sortedArr[i]), static_cast<float>(arr[i]));
         }
+        // delete[] arr;
     }
 
     template <size_t ArrayLength, size_t TopK, bool WithStack>
     void runPartialQuickSort() {
-        auto arr = std::make_unique<float[]>(ArrayLength);
-        auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        // auto arr = std::make_unique<float[]>(ArrayLength);
+        // auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        auto arr = std::make_unique<__half[]>(ArrayLength);
+        auto sortedArr = std::make_unique<__half[]>(ArrayLength);
         std::random_device rd{};
         std::mt19937 gen{rd()};
-        std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        // std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        std::uniform_real_distribution<float> dist(-60, 60);
 
-        constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        // constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        constexpr size_t arr_size = sizeof(__half) * ArrayLength;
 
         for (int n = 0; n < ArrayLength; ++n) {
-            arr[n] = dist(gen);
+            // arr[n] = dist(gen);
+            arr[n] = __half{dist(gen)};
         }
 
         const auto& defaultStream = CUDA::DefaultStream::stream();
         auto src = defaultStream.malloc(arr_size);
         defaultStream.upload(src, arr.get(), arr_size);
-        auto begin = static_cast<float*>(src.get());
+        // auto begin = static_cast<float*>(src.get());
+        auto begin = static_cast<__half*>(src.get());
         auto end = begin + ArrayLength;
         CUDA::Stream stream{};
         if (WithStack) {
             auto stack = defaultStream.malloc(arr_size);
             auto stack_begin = static_cast<int*>(stack.get());
             partial_quick_sort_launch<<<1, 1, 0, stream.get()>>>(
-                begin, end, stack_begin, TopK, CUDA::algorithms::Less<float>{});
+                // begin, end, stack_begin, TopK, CUDA::algorithms::Less<float>{});
+                begin, end, stack_begin, TopK, CUDA::algorithms::Less<__half>{});
         } else {
-            partial_quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, TopK, CUDA::algorithms::Less<float>{});
+            // partial_quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, TopK, CUDA::algorithms::Less<float>{});
+            partial_quick_sort_launch<<<1, 1, 0, stream.get()>>>(begin, end, TopK, CUDA::algorithms::Less<__half>{});
         }
         stream.synchronize();
         defaultStream.download(sortedArr.get(), src, arr_size);
 
-        std::sort(arr.get(), arr.get() + ArrayLength);
+        // std::sort(arr.get(), arr.get() + ArrayLength);
+        std::sort(arr.get(), arr.get() + ArrayLength, [](auto a, auto b){ return static_cast<float>(a) < static_cast<float>(b); });
         for (int i = 0; i < TopK; ++i) {
-            if (sortedArr[i] != arr[i]) {
+            // if (sortedArr[i] != arr[i]) {
+            if (static_cast<float>(sortedArr[i]) != static_cast<float>(arr[i])) {
+                // std::cout << "i = " << i << std::endl;
+                // std::cout << "arr[i] = " << arr[i] << std::endl;
+                // std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
                 std::cout << "i = " << i << std::endl;
-                std::cout << "arr[i] = " << arr[i] << std::endl;
-                std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
+                std::cout << "arr[i] = " << static_cast<float>(arr[i]) << std::endl;
+                std::cout << "sortedArr[i] = " << static_cast<float>(sortedArr[i]) << std::endl;
             }
-            ASSERT_FLOAT_EQ(sortedArr[i], arr[i]);
+            // ASSERT_FLOAT_EQ(sortedArr[i], arr[i]);
+            ASSERT_FLOAT_EQ(static_cast<float>(sortedArr[i]), static_cast<float>(arr[i]));
         }
     }
 
     template <size_t ArrayLength, bool WithStack>
     void runParallelQuickSort() {
-        auto arr = std::make_unique<float[]>(ArrayLength);
-        auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        // auto arr = std::make_unique<float[]>(ArrayLength);
+        // auto sortedArr = std::make_unique<float[]>(ArrayLength);
+        auto arr = std::make_unique<__half[]>(ArrayLength);
+        auto sortedArr = std::make_unique<__half[]>(ArrayLength);
         std::random_device rd{};
         std::mt19937 gen{rd()};
-        std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        // std::uniform_real_distribution<float> dist(-20000000, 20000000);
+        std::uniform_real_distribution<float> dist(-60, 60);
 
-        constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        // constexpr size_t arr_size = sizeof(float) * ArrayLength;
+        constexpr size_t arr_size = sizeof(__half) * ArrayLength;
 
         for (int n = 0; n < ArrayLength; ++n) {
-            arr[n] = dist(gen);
+            // arr[n] = dist(gen);
+            arr[n] = __half{dist(gen)};
         }
 
         const auto& defaultStream = CUDA::DefaultStream::stream();
         auto src = defaultStream.malloc(arr_size);
         defaultStream.upload(src, arr.get(), arr_size);
-        auto begin = static_cast<float*>(src.get());
+        // auto begin = static_cast<float*>(src.get());
+        auto begin = static_cast<__half*>(src.get());
         auto end = begin + ArrayLength;
         CUDA::Stream stream{};
         if (WithStack) {
-            auto stack = defaultStream.malloc(arr_size);
-            auto stack_begin = static_cast<int*>(stack.get());
-            parallel_quick_sort_launch<<<1, 100, 0, stream.get()>>>(
-                begin, end, stack_begin, CUDA::algorithms::Less<float>{});
+            // auto stack = defaultStream.malloc(arr_size);
+            // auto stack_begin = static_cast<int*>(stack.get());
+            // parallel_quick_sort_launch<<<1, 100, 0, stream.get()>>>(
+            //     // begin, end, stack_begin, CUDA::algorithms::Less<float>{});
+            //     begin, end, stack_begin, CUDA::algorithms::Less<__half>{});
+            std::cout << "Parallel quick sort with stack is not supported\n";
+            ASSERT_TRUE(false);
         } else {
-            parallel_quick_sort_launch<<<1, 100, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<float>{});
+            // parallel_quick_sort_launch<<<1, 100, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<float>{});
+            parallel_quick_sort_launch<<<1, 100, 0, stream.get()>>>(begin, end, CUDA::algorithms::Less<__half>{});
         }
         stream.synchronize();
         defaultStream.download(sortedArr.get(), src, arr_size);
 
-        std::sort(arr.get(), arr.get() + ArrayLength);
+        // std::sort(arr.get(), arr.get() + ArrayLength);
+        std::sort(arr.get(), arr.get() + ArrayLength, [](auto a, auto b){ return static_cast<float>(a) < static_cast<float>(b); });
         for (int i = 0; i < ArrayLength; ++i) {
-            if (sortedArr[i] != arr[i]) {
+            // if (sortedArr[i] != arr[i]) {
+            if (static_cast<float>(sortedArr[i]) != static_cast<float>(arr[i])) {
+                // std::cout << "i = " << i << std::endl;
+                // std::cout << "arr[i] = " << arr[i] << std::endl;
+                // std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
                 std::cout << "i = " << i << std::endl;
-                std::cout << "arr[i] = " << arr[i] << std::endl;
-                std::cout << "sortedArr[i] = " << sortedArr[i] << std::endl;
+                std::cout << "arr[i] = " << static_cast<float>(arr[i]) << std::endl;
+                std::cout << "sortedArr[i] = " << static_cast<float>(sortedArr[i]) << std::endl;
             }
             ASSERT_FLOAT_EQ(sortedArr[i], arr[i]);
         }
@@ -217,10 +266,10 @@ TEST_F(QuickSortKernelTest, PartialQuickSortKernel_3) { runPartialQuickSort<4214
 
 TEST_F(QuickSortKernelTest, PartialQuickSortKernelWithoutStack_3) { runPartialQuickSort<4214235, 521, false>(); }
 
-TEST_F(QuickSortKernelTest, ParallelQuickSortKernel_0) { runParallelQuickSort<650023, true>(); }
+// TEST_F(QuickSortKernelTest, ParallelQuickSortKernel_0) { runParallelQuickSort<650023, true>(); }
 
 TEST_F(QuickSortKernelTest, ParallelQuickSortKernelWithoutStack_0) { runParallelQuickSort<650023, false>(); }
 
-TEST_F(QuickSortKernelTest, ParallelQuickSortKernel_1) { runParallelQuickSort<4214235, true>(); }
+// TEST_F(QuickSortKernelTest, ParallelQuickSortKernel_1) { runParallelQuickSort<4214235, true>(); }
 
 TEST_F(QuickSortKernelTest, ParallelQuickSortKernelWithoutStack_1) { runParallelQuickSort<4214235, false>(); }

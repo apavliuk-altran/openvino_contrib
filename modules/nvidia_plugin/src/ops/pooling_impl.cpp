@@ -57,7 +57,7 @@ PoolingImpl::PoolingImpl(const ov::op::v1::MaxPool& node)
       input_tensor_descriptor_{},
       output_tensor_descriptor_{} {
     pooling_descriptor_.set(mode_,
-                            CUDNN_PROPAGATE_NAN,
+                            CUDNN_NOT_PROPAGATE_NAN,
                             spatial_dims(),
                             spatial_shape_from_ngraph(node.get_kernel()).data(),
                             paddings_from_ngraph(node.get_pads_begin(), node.get_pads_end(), mode_).data(),
@@ -88,7 +88,7 @@ PoolingImpl::PoolingImpl(const ov::op::v1::AvgPool& node)
       input_tensor_descriptor_{},
       output_tensor_descriptor_{} {
     pooling_descriptor_.set(mode_,
-                            CUDNN_PROPAGATE_NAN,
+                            CUDNN_NOT_PROPAGATE_NAN,
                             spatial_dims(),
                             spatial_shape_from_ngraph(node.get_kernel()).data(),
                             paddings_from_ngraph(node.get_pads_begin(), node.get_pads_end(), mode_).data(),

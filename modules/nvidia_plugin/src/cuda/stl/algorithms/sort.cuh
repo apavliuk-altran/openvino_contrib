@@ -295,64 +295,64 @@ __device__ void partial_quick_sort_iterative(TIterator begin, TIterator end, siz
 
 namespace parallel {
 
-/**
- * Parallel quick sort iterative algorithm
- * @tparam NumPartitions  The maximum number of partitions
- * @tparam T Type of data to sort
- * @tparam Comparer Type of custom comparer
- * @param begin Begin of sequence to iterate
- * @param end End of sequence to iterate (last element + 1)
- * @param stack Additional workspace for storing partition pivots
- * @param comparer Custom comparer
- * @param workItemId Id of work item
- * @param numWorkItems Number of work items
- */
-template <size_t NumPartitions, typename TIterator, typename Comparer>
-__forceinline__ __device__ void quick_sort_iterative(
-    TIterator begin, TIterator end, int* stack, Comparer comparer, const int workItemId, const size_t numWorkItems) {
-    if (end <= begin) {
-        return;
-    }
+// /**
+//  * Parallel quick sort iterative algorithm
+//  * @tparam NumPartitions  The maximum number of partitions
+//  * @tparam T Type of data to sort
+//  * @tparam Comparer Type of custom comparer
+//  * @param begin Begin of sequence to iterate
+//  * @param end End of sequence to iterate (last element + 1)
+//  * @param stack Additional workspace for storing partition pivots
+//  * @param comparer Custom comparer
+//  * @param workItemId Id of work item
+//  * @param numWorkItems Number of work items
+//  */
+// template <size_t NumPartitions, typename TIterator, typename Comparer>
+// __forceinline__ __device__ void quick_sort_iterative(
+//     TIterator begin, TIterator end, int* stack, Comparer comparer, const int workItemId, const size_t numWorkItems) {
+//     if (end <= begin) {
+//         return;
+//     }
 
-    __shared__ int partitions[NumPartitions][2];
-    if (workItemId < NumPartitions) {
-        if (workItemId == 0) {
-            partitions[workItemId][0] = 0;
-            partitions[workItemId][1] = (end - begin) - 1;
-        } else {
-            partitions[workItemId][0] = 0;
-            partitions[workItemId][1] = 0;
-        }
-    }
-    __syncthreads();
+//     __shared__ int partitions[NumPartitions][2];
+//     if (workItemId < NumPartitions) {
+//         if (workItemId == 0) {
+//             partitions[workItemId][0] = 0;
+//             partitions[workItemId][1] = (end - begin) - 1;
+//         } else {
+//             partitions[workItemId][0] = 0;
+//             partitions[workItemId][1] = 0;
+//         }
+//     }
+//     __syncthreads();
 
-    const int first_id = workItemId;
-    for (int range_step = 1, maxWorkingNum = 1, chunkSize = end - begin;
-         range_step < numWorkItems && range_step < NumPartitions;
-         range_step *= 2, maxWorkingNum *= 2, chunkSize /= 2) {
-        const int second_id = first_id + range_step;
-        if (second_id < numWorkItems && second_id < NumPartitions) {
-            const int begin_id = partitions[first_id][0];
-            const int end_id = partitions[first_id][1];
-            if (begin_id < end_id) {
-                const int pivot = algorithms::partition(begin, begin_id, end_id, comparer);
-                partitions[first_id][0] = begin_id;
-                partitions[first_id][1] = CUDA::math::max(pivot - 1, begin_id);
-                partitions[second_id][0] = CUDA::math::min(pivot + 1, end_id);
-                partitions[second_id][1] = end_id;
-            }
-        }
-        __syncthreads();
-    }
+//     const int first_id = workItemId;
+//     for (int range_step = 1, maxWorkingNum = 1, chunkSize = end - begin;
+//          range_step < numWorkItems && range_step < NumPartitions;
+//          range_step *= 2, maxWorkingNum *= 2, chunkSize /= 2) {
+//         const int second_id = first_id + range_step;
+//         if (second_id < numWorkItems && second_id < NumPartitions) {
+//             const int begin_id = partitions[first_id][0];
+//             const int end_id = partitions[first_id][1];
+//             if (begin_id < end_id) {
+//                 const int pivot = algorithms::partition(begin, begin_id, end_id, comparer);
+//                 partitions[first_id][0] = begin_id;
+//                 partitions[first_id][1] = CUDA::math::max(pivot - 1, begin_id);
+//                 partitions[second_id][0] = CUDA::math::min(pivot + 1, end_id);
+//                 partitions[second_id][1] = end_id;
+//             }
+//         }
+//         __syncthreads();
+//     }
 
-    if (workItemId < NumPartitions) {
-        auto begin_id = partitions[workItemId][0];
-        auto end_id = partitions[workItemId][1];
-        if (begin_id < end_id) {
-            algorithms::quick_sort_iterative(begin + begin_id, begin + end_id + 1, stack + begin_id, comparer);
-        }
-    }
-}
+//     if (workItemId < NumPartitions) {
+//         auto begin_id = partitions[workItemId][0];
+//         auto end_id = partitions[workItemId][1];
+//         if (begin_id < end_id) {
+//             algorithms::quick_sort_iterative(begin + begin_id, begin + end_id + 1, stack + begin_id, comparer);
+//         }
+//     }
+// }
 
 /**
  * Parallel quick sort iterative algorithm

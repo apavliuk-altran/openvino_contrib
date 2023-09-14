@@ -101,7 +101,7 @@ CUDA::DnnRnnDescriptor LSTMCellParamsCuDnn::makeRNNDescriptor() const {
     }
     // TODO: If cuDNN starts supporting similar clipping as OpenVino, remove the 'throw' above and uncomment:
     // const auto clip_mode = is_clipped ? CUDNN_RNN_CLIP_MINMAX : CUDNN_RNN_CLIP_NONE;
-    // const auto clip_nan_opt = CUDNN_PROPAGATE_NAN;
+    // const auto clip_nan_opt = CUDNN_NOT_PROPAGATE_NAN;
     // const auto lclip = -clip();
     // const auto rclip = clip();
     // rnn_desc.setClip(clip_mode, clip_nan_opt, lclip, rclip);
@@ -451,7 +451,7 @@ CUDA::DnnRnnDescriptor GRUCellParamsCuDnn::makeRNNDescriptor() const {
     }
     // TODO: If cuDNN starts supporting similar clipping as OpenVino, remove the 'throw' above and uncomment:
     // const auto clip_mode = is_clipped ? CUDNN_RNN_CLIP_MINMAX : CUDNN_RNN_CLIP_NONE;
-    // const auto clip_nan_opt = CUDNN_PROPAGATE_NAN;
+    // const auto clip_nan_opt = CUDNN_NOT_PROPAGATE_NAN;
     // const auto lclip = -clip();
     // const auto rclip = clip();
     // rnn_desc.setClip(clip_mode, clip_nan_opt, lclip, rclip);

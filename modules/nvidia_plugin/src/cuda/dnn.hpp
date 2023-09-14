@@ -101,23 +101,23 @@ public:
 
 class SigmoidDescriptor : public DnnActivationDescriptor {
 public:
-    SigmoidDescriptor() { set(CUDNN_ACTIVATION_SIGMOID, CUDNN_PROPAGATE_NAN, 0); }
+    SigmoidDescriptor() { set(CUDNN_ACTIVATION_SIGMOID, CUDNN_NOT_PROPAGATE_NAN, 0); }
 };
 
 class ReluDescriptor : public DnnActivationDescriptor {
 public:
-    ReluDescriptor() : DnnActivationDescriptor{} { set(CUDNN_ACTIVATION_RELU, CUDNN_PROPAGATE_NAN, 0); }
+    ReluDescriptor() : DnnActivationDescriptor{} { set(CUDNN_ACTIVATION_RELU, CUDNN_NOT_PROPAGATE_NAN, 0); }
 };
 
 class TanhDescriptor : public DnnActivationDescriptor {
 public:
-    TanhDescriptor() { set(CUDNN_ACTIVATION_TANH, CUDNN_PROPAGATE_NAN, 0); }
+    TanhDescriptor() { set(CUDNN_ACTIVATION_TANH, CUDNN_NOT_PROPAGATE_NAN, 0); }
 };
 
 class ClippedReluDescriptor : public DnnActivationDescriptor {
 public:
     explicit ClippedReluDescriptor(double threshold) {
-        set(CUDNN_ACTIVATION_CLIPPED_RELU, CUDNN_PROPAGATE_NAN, threshold);
+        set(CUDNN_ACTIVATION_CLIPPED_RELU, CUDNN_NOT_PROPAGATE_NAN, threshold);
     }
 };
 
@@ -235,7 +235,7 @@ public:
     explicit DnnReduceAddDescriptor(cudnnDataType_t compType) {
         set(CUDNN_REDUCE_TENSOR_ADD,
             compType,
-            CUDNN_PROPAGATE_NAN,
+            CUDNN_NOT_PROPAGATE_NAN,
             CUDNN_REDUCE_TENSOR_NO_INDICES,
             CUDNN_32BIT_INDICES);
     }
@@ -246,7 +246,7 @@ public:
     explicit DnnReduceMulDescriptor(cudnnDataType_t compType) {
         set(CUDNN_REDUCE_TENSOR_MUL,
             compType,
-            CUDNN_PROPAGATE_NAN,
+            CUDNN_NOT_PROPAGATE_NAN,
             CUDNN_REDUCE_TENSOR_NO_INDICES,
             CUDNN_32BIT_INDICES);
     }
@@ -257,7 +257,7 @@ public:
     explicit DnnReduceMinDescriptor(cudnnDataType_t compType) {
         set(CUDNN_REDUCE_TENSOR_MIN,
             compType,
-            CUDNN_PROPAGATE_NAN,
+            CUDNN_NOT_PROPAGATE_NAN,
             CUDNN_REDUCE_TENSOR_NO_INDICES,
             CUDNN_32BIT_INDICES);
     }
@@ -268,7 +268,7 @@ public:
     explicit DnnReduceMaxDescriptor(cudnnDataType_t compType) {
         set(CUDNN_REDUCE_TENSOR_MAX,
             compType,
-            CUDNN_PROPAGATE_NAN,
+            CUDNN_NOT_PROPAGATE_NAN,
             CUDNN_REDUCE_TENSOR_NO_INDICES,
             CUDNN_32BIT_INDICES);
     }
@@ -279,7 +279,7 @@ public:
     explicit DnnReduceAvgDescriptor(cudnnDataType_t compType) {
         set(CUDNN_REDUCE_TENSOR_AVG,
             compType,
-            CUDNN_PROPAGATE_NAN,
+            CUDNN_NOT_PROPAGATE_NAN,
             CUDNN_REDUCE_TENSOR_NO_INDICES,
             CUDNN_32BIT_INDICES);
     }

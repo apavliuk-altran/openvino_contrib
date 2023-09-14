@@ -150,7 +150,7 @@ FusedConvolutionCuDnnBE::FusedConvolutionCuDnnBE(const CreationContext& context,
                 CUDA::DnnBEPointwiseDescriptorBuilder()
                     .setMode(convertActivationModeToBE(params.activation_))
                     .setMathPrecision(convertConvBackendDataType(DnnTensorID::bias_output, dataType))
-                    .setMode(CUDNN_PROPAGATE_NAN);
+                    .setMode(CUDNN_NOT_PROPAGATE_NAN);
             if (convertConvBackendDataType(DnnTensorID::bias_output, dataType) == CUDNN_DATA_DOUBLE) {
                 activation_desc_builder.setReluLowerClip(0.);
                 activation_desc_builder.setReluUpperClip(std::numeric_limits<double>::max());

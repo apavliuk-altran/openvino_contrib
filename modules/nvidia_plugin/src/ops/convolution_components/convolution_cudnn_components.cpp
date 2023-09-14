@@ -532,7 +532,7 @@ std::shared_ptr<CUDA::DnnTensorDescriptor> MakeFusedAddDescriptor(const ov::Shap
 
 std::shared_ptr<CUDA::DnnActivationDescriptor> MakeFusedActivationDescriptor(nodes::ActivationMode mode) {
     auto desc = std::make_shared<CUDA::DnnActivationDescriptor>();
-    desc->set(convertActivationMode(mode), CUDNN_PROPAGATE_NAN, 0);
+    desc->set(convertActivationMode(mode), CUDNN_NOT_PROPAGATE_NAN, 0);
     return desc;
 }
 

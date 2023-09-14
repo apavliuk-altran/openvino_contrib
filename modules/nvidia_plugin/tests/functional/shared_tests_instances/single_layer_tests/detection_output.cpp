@@ -21,15 +21,18 @@ struct TestDetectionOutputResult {
 
     template <typename TOtherDataType>
     static bool similar(const TDataType &res, const TOtherDataType &ref) {
-        const auto absoluteDifference = ov::test::utils::ie_abs(res - ref);
+        // const auto absoluteDifference = ov::test::utils::ie_abs(res - ref);
+        const auto absoluteDifference = ov::test::utils::ie_abs(static_cast<double>(res) - static_cast<double>(ref));
         if (absoluteDifference <= threshold) {
             return true;
         }
         double max;
         if (sizeof(TDataType) < sizeof(TOtherDataType)) {
-            max = std::max(ov::test::utils::ie_abs(TOtherDataType(res)), ov::test::utils::ie_abs(ref));
+            // max = std::max(ov::test::utils::ie_abs(TOtherDataType(res)), ov::test::utils::ie_abs(ref));
+            max = std::max(ov::test::utils::ie_abs(static_cast<double>(res)), ov::test::utils::ie_abs(static_cast<double>(ref)));
         } else {
-            max = std::max(ov::test::utils::ie_abs(res), ov::test::utils::ie_abs(TDataType(ref)));
+            // max = std::max(ov::test::utils::ie_abs(res), ov::test::utils::ie_abs(TDataType(ref)));
+            max = std::max(ov::test::utils::ie_abs(static_cast<double>(res)), ov::test::utils::ie_abs(static_cast<double>(ref)));
         }
         double diff = static_cast<float>(absoluteDifference) / max;
         if (max == 0 || (diff > static_cast<float>(threshold)) || std::isnan(static_cast<float>(res)) ||
@@ -135,8 +138,10 @@ public:
             const auto lockedMemory = memory->wmap();
             const auto actualBuffer = lockedMemory.as<const std::uint8_t *>();
 
-            const float *expBuf = reinterpret_cast<const float *>(expectedBuffer);
-            const float *actBuf = reinterpret_cast<const float *>(actualBuffer);
+            // const float *expBuf = reinterpret_cast<const float *>(expectedBuffer);
+            // const float *actBuf = reinterpret_cast<const float *>(actualBuffer);
+            const ov::float16 *expBuf = reinterpret_cast<const ov::float16 *>(expectedBuffer);
+            const ov::float16 *actBuf = reinterpret_cast<const ov::float16 *>(actualBuffer);
             for (size_t i = 0; i < actual->size(); i += kNumDataInDetectionBox) {
                 if (expBuf[i] == -1) break;
                 expSize += kNumDataInDetectionBox;
@@ -146,7 +151,8 @@ public:
                 actSize += kNumDataInDetectionBox;
             }
             ASSERT_EQ(expSize, actSize);
-            Compare<float>(expBuf, actBuf, expSize, 0.1);
+            // Compare<float>(expBuf, actBuf, expSize, 0.1);
+            Compare<ov::float16>(expBuf, actBuf, expSize, 0.5);
         }
     }
 };

@@ -18,7 +18,7 @@ public:
                       IndexCollection&& inputIds,
                       IndexCollection&& outputIds,
                       const cudnnOpTensorOp_t& opType,
-                      const cudnnNanPropagation_t& nanPropogationType = cudnnNanPropagation_t::CUDNN_PROPAGATE_NAN);
+                      const cudnnNanPropagation_t& nanPropogationType = cudnnNanPropagation_t::CUDNN_NOT_PROPAGATE_NAN);
     void Execute(const InferenceRequestContext& context,
                  Inputs inputTensors,
                  Outputs outputTensors,

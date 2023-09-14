@@ -109,10 +109,14 @@ __device__ void decode_bbox(const DetectionOutput::Attrs& attrs,
     TDataType priorYmax = priorBboxes.ymax;
 
     if (!attrs.normalized) {
-        priorXmin /= static_cast<double>(attrs.input_width);
-        priorYmin /= static_cast<double>(attrs.input_height);
-        priorXmax /= static_cast<double>(attrs.input_width);
-        priorYmax /= static_cast<double>(attrs.input_height);
+        // priorXmin /= static_cast<double>(attrs.input_width);
+        // priorYmin /= static_cast<double>(attrs.input_height);
+        // priorXmax /= static_cast<double>(attrs.input_width);
+        // priorYmax /= static_cast<double>(attrs.input_height);
+        priorXmin /= TDataType{static_cast<float>(attrs.input_width)};
+        priorYmin /= TDataType{static_cast<float>(attrs.input_height)};
+        priorXmax /= TDataType{static_cast<float>(attrs.input_width)};
+        priorYmax /= TDataType{static_cast<float>(attrs.input_height)};
     }
 
     if (attrs.code_type == DetectionOutput::Attrs::CodeType::Caffe_PriorBoxParameter_CORNER) {
@@ -661,9 +665,12 @@ __global__ void detection_output_stage_2_results(
             if (bboxes[prioIdx] == InvalidNormalizedBBox<TDataType>{}) {
                 continue;
             }
-            results[count].img = static_cast<double>(image_idx);
-            results[count].cls = static_cast<double>(attrs.decrease_label_id ? (clsIdx - 1) : clsIdx);
-            results[count].conf = static_cast<double>(imageConfPreds(clsIdx, prioIdx));
+            // results[count].img = static_cast<double>(image_idx);
+            // results[count].cls = static_cast<double>(attrs.decrease_label_id ? (clsIdx - 1) : clsIdx);
+            // results[count].conf = static_cast<double>(imageConfPreds(clsIdx, prioIdx));
+            results[count].img = TDataType{static_cast<float>(image_idx)};
+            results[count].cls = TDataType{static_cast<float>(attrs.decrease_label_id ? (clsIdx - 1) : clsIdx)};
+            results[count].conf = TDataType{static_cast<float>(imageConfPreds(clsIdx, prioIdx))};
 
             const auto& bbox = bboxes[prioIdx];
             TDataType xmin = bbox.xmin;
