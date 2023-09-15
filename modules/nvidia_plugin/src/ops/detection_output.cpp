@@ -15,7 +15,7 @@ DetectionOutputOp::DetectionOutputOp(const CreationContext& context,
                                      const NodeOp& node,
                                      IndexCollection&& inputIds,
                                      IndexCollection&& outputIds)
-    : OperationBase{context, node, move(inputIds), move(outputIds)}, element_type_{node.get_input_element_type(0)} {
+    : OperationBase{context, node, move(inputIds), move(outputIds)}, element_type_{node.get_element_type()} {
 
     std::cout << "*******************************************************************************************************\n";
     std::cout << "*******************************************************************************************************\n";
@@ -25,6 +25,9 @@ DetectionOutputOp::DetectionOutputOp(const CreationContext& context,
     std::cout << "*******************************************************************************************************\n";
     std::cout << "*******************************************************************************************************\n";
 
+    for (const auto& input: node.inputs()) {
+        OPENVINO_ASSERT(input.get_element_type() == element_type_, "Node name: ", GetName());
+    }
     const auto& ngraph_attrs = node.get_attrs();
     kernel::DetectionOutput::Attrs kernel_attrs;
 

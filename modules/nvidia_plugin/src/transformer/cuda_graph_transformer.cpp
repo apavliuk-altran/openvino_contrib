@@ -29,6 +29,7 @@
 
 #include "bidirectional_lstm_sequence_composition.hpp"
 #include "concat_transformation.hpp"
+#include "detection_output_to_f32_transformation.hpp"
 #include "fuse_matmul_add.hpp"
 #include "matmul_transformations.hpp"
 #include "reduce_transformation.hpp"
@@ -49,9 +50,16 @@ void GraphTransformer::transform(const CUDA::Device& device,
                                  std::shared_ptr<ov::Model>& model,
                                  const Configuration& config) const {
     auto inference_precision = config.get_inference_precision();
+
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    std::cout << "inference_precision: " << inference_precision << '\n';
+
     if (inference_precision == ov::element::f16 && !isHalfSupported(device)) {
         inference_precision = ov::element::f32;
     }
+
+    std::cout << "inference_precision: " << inference_precision << '\n';
+
     auto upscale_precision = [&]() -> bool {
         return !isHalfSupported(device) || inference_precision == ov::element::f32;
     };
@@ -64,10 +72,18 @@ void GraphTransformer::transform(const CUDA::Device& device,
     };
     type_to_fuse_map empty_fuse_map = {};
     if (upscale_precision()) {
+
+        std::cout << "upscale precision...\n";
+
         fp_convert_precision_map.insert(std::make_pair(ov::element::f16, ov::element::f32));
     } else if (downscale_precision()) {
+
+        std::cout << "downscale precision...\n";
+
         fp_convert_precision_map.insert(std::make_pair(ov::element::f32, ov::element::f16));
     }
+
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 
     auto pass_config = std::make_shared<ov::pass::PassConfig>();
     ov::pass::Manager pass_manager{pass_config};
@@ -149,8 +165,12 @@ void GraphTransformer::transform(const CUDA::Device& device,
     pass_manager.register_pass<ov::nvidia_gpu::pass::FusedConvBackpropDataAsymPaddingTransformation>();
     pass_manager.register_pass<ov::nvidia_gpu::pass::TransposeMatMulTransformation>();
     pass_manager.register_pass<ov::nvidia_gpu::pass::FullyConnectedTransformation>();
-    pass_manager.register_pass<ov::nvidia_gpu::pass::ConcatTransformation>();
+    // pass_manager.register_pass<ov::nvidia_gpu::pass::ConcatTransformation>();
     pass_manager.register_pass<ov::nvidia_gpu::pass::ReduceTransformation>();
+
+    pass_manager.register_pass<ov::nvidia_gpu::pass::DetectionOutputToF32Transformation>();
+    // pass_manager.register_pass<ov::nvidia_gpu::pass::RemoveRedundantConvertTransformation>();
+
     // Do we actually need to eliminate broadcast one more time at the end?
     pass_manager.register_pass<ov::pass::NopElimination>();
 
