@@ -131,13 +131,13 @@ void CompiledModel::compile_model(const std::shared_ptr<const ov::Model>& model)
     const bool opBenchOption = config_.get(ov::nvidia_gpu::operation_benchmark.name()).as<bool>();
     const auto creationContext = CreationContext{device, opBenchOption};
 
-    if (use_cuda_graph_) {
-        auto cudaGraphTopologyRunner = std::make_unique<CudaGraphTopologyRunner>(creationContext, model_);
-        number_of_cuda_graphs_ = cudaGraphTopologyRunner->GetCudaGraphsCount();
-        topology_runner_ = std::move(cudaGraphTopologyRunner);
-    } else {
+    // if (use_cuda_graph_) {
+    //     auto cudaGraphTopologyRunner = std::make_unique<CudaGraphTopologyRunner>(creationContext, model_);
+    //     number_of_cuda_graphs_ = cudaGraphTopologyRunner->GetCudaGraphsCount();
+    //     topology_runner_ = std::move(cudaGraphTopologyRunner);
+    // } else {
         topology_runner_ = std::make_unique<EagerTopologyRunner>(creationContext, model_);
-    }
+    // }
 
     memory_pool_ = create_memory_pool();
 }
