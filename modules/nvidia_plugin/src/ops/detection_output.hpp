@@ -33,6 +33,10 @@ public:
 private:
     const ov::element::Type element_type_;
     std::optional<kernel::DetectionOutput> kernel_;
+
+    size_t in_size_0_ = 0;
+    size_t in_size_1_ = 0;
+    size_t in_size_2_ = 0;
 };
 
 }  // namespace nvidia_gpu

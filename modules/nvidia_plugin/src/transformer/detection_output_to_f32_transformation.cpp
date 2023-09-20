@@ -24,7 +24,8 @@ bool detection_output_convert_inputs(Matcher &m) {
         return false;
     }
 
-    const auto& type = d_out->get_element_type();
+    // const auto& type = d_out->get_element_type();
+    const auto type = ov::element::Type_t::f32;
     // if (type != ov::element::Type_t::bf16 && type != ov::element::Type_t::f16 && type != ov::element::Type_t::f64) {
     //     return false;
     // }
@@ -56,13 +57,19 @@ bool detection_output_convert_inputs(Matcher &m) {
     }
     new_d_out->set_friendly_name(d_out->get_friendly_name());
 
-    // const auto out_convert = std::make_shared<ov::op::v0::Convert>(new_d_out, type);
+    ov::copy_runtime_info(d_out, new_d_out);
+
+    if (d_out->get_element_type() != type) {
+        const auto out_convert = std::make_shared<ov::op::v0::Convert>(new_d_out, type);
+        ov::copy_runtime_info(d_out, out_convert);
+        ov::replace_node(d_out, out_convert);
+    } else {
+        ov::replace_node(d_out, new_d_out);
+    }
 
     // ov::copy_runtime_info(d_out, input_nodes);
     // ov::copy_runtime_info(d_out, {new_d_out, out_convert});
-    ov::copy_runtime_info(d_out, new_d_out);
     // ov::replace_node(d_out, out_convert);
-    ov::replace_node(d_out, new_d_out);
 
     return true;
 }

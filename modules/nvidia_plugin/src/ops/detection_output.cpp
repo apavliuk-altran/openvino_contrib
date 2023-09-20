@@ -86,7 +86,24 @@ DetectionOutputOp::DetectionOutputOp(const CreationContext& context,
                                                         ov::shape_size(node.get_output_shape(0)),
                                                         kernel_attrs);
     }
+
+    in_size_0_ = ov::shape_size(node.get_input_shape(0));
+    in_size_1_ = ov::shape_size(node.get_input_shape(1));
+    in_size_2_ = ov::shape_size(node.get_input_shape(2));
 }
+
+template <typename T>
+void print_input(const CUDA::DevicePointer<const void*> ptr, size_t size, const CUDA::Stream& stream) {
+    constexpr size_t SIZE_LIMIT = 20ul;
+    const size_t print_size = std::min(SIZE_LIMIT, size);
+    std::vector<T> vec(print_size);
+    stream.download(vec.data(), ptr, print_size * sizeof(T));
+    for (auto&& el : vec) {
+        std::cout << el << '\n';
+    }
+    std::cout << '\n';
+}
+
 
 void DetectionOutputOp::Execute(const InferenceRequestContext& context,
                                 Inputs inputTensors,
@@ -103,6 +120,39 @@ void DetectionOutputOp::Execute(const InferenceRequestContext& context,
                    workbuffers.mutable_buffers,
                    outputTensors[0]);
     } else {
+        std::cout << "====================================================================================================\n";
+        std::cout << "input0\n";
+        std::cout << "====================================================================================================\n";
+        if (element_type_ == ov::element::Type_t::f32) {
+            print_input<float>(inputTensors[0], in_size_0_, stream);
+        } else if (element_type_ == ov::element::Type_t::f16) {
+            print_input<ov::float16>(inputTensors[0], in_size_0_, stream);
+        } else {
+            std::cout << "!!!!!!!!WRONG INPUT TYPE!!!!!!!";
+        }
+        std::cout << "====================================================================================================\n";
+        std::cout << "input1\n";
+        std::cout << "====================================================================================================\n";
+        if (element_type_ == ov::element::Type_t::f32) {
+            print_input<float>(inputTensors[1], in_size_1_, stream);
+        } else if (element_type_ == ov::element::Type_t::f16) {
+            print_input<ov::float16>(inputTensors[1], in_size_1_, stream);
+        } else {
+            std::cout << "!!!!!!!!WRONG INPUT TYPE!!!!!!!";
+        }
+        std::cout << "====================================================================================================\n";
+        std::cout << "input2\n";
+        std::cout << "====================================================================================================\n";
+        if (element_type_ == ov::element::Type_t::f32) {
+            print_input<float>(inputTensors[2], in_size_2_, stream);
+        } else if (element_type_ == ov::element::Type_t::f16) {
+            print_input<ov::float16>(inputTensors[2], in_size_2_, stream);
+        } else {
+            std::cout << "!!!!!!!!WRONG INPUT TYPE!!!!!!!";
+        }
+        std::cout << "====================================================================================================\n";
+
+
         (*kernel_)(stream,
                    inputTensors[0],
                    inputTensors[1],
