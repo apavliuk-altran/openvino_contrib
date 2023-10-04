@@ -297,6 +297,9 @@ void TensorIteratorOp::copyParam(const CUDA::Stream& stream,
                                  const std::int64_t iter,
                                  const uint64_t inputIdx,
                                  const uint64_t paramIdx) const {
+    std::cout << "---------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::copyParam()\n";
+
     auto& memoryManager = *memory_manager_;
     const std::size_t inputSize = inputs_info_[inputIdx].size_;
     const std::size_t paramSize = params_info_[paramIdx].size_;
@@ -305,6 +308,9 @@ void TensorIteratorOp::copyParam(const CUDA::Stream& stream,
         const auto& param = params_[paramIdx];
         auto outputTensors = memoryManager.outputTensorPointers(*param, mutableBuffer);
         OPENVINO_ASSERT(inputSize == paramSize, "Node name: ", GetName());
+
+        std::cout << "stream.transfer()\n";
+
         stream.transfer(outputTensors[0], input, inputSize);
     } else {
         const auto& portMap = portmap_inputs_.at(inputIdx);
@@ -321,14 +327,21 @@ void TensorIteratorOp::copyParam(const CUDA::Stream& stream,
         }
         start += iter * portMap.stride;
         auto input = inputTensors[inputIdx];
+
+        std::cout << "slice()\n";
+
         slice(stream.get(), input.get(), outputTensors[0].get(), start);
     }
+    std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 void TensorIteratorOp::copyBackEdge(const CUDA::Stream& stream,
                                     CUDA::DevicePointer<void*> mutableBuffer,
                                     const uint64_t resultIdx,
                                     const uint64_t paramIdx) const {
+    std::cout << "=======================================================================================\n";
+    std::cout << "TensorIteratorOp::copyBackEdge()\n";
+
     auto& memoryManager = *memory_manager_;
     const auto& result = results_[resultIdx];
     const auto& param = params_[paramIdx];
@@ -337,7 +350,11 @@ void TensorIteratorOp::copyBackEdge(const CUDA::Stream& stream,
     const std::size_t paramSize = params_info_[paramIdx].size_;
     const std::size_t resultSize = results_info_[resultIdx].size_;
     OPENVINO_ASSERT(paramSize == resultSize, "Node name: ", GetName());
+
+    std::cout << "stream.transfer()\n";
+
     stream.transfer(paramTensors[0], resultTensors[0], paramSize);
+    std::cout << "=======================================================================================\n";
 }
 
 void TensorIteratorOp::copyResult(const CUDA::Stream& stream,
@@ -346,6 +363,9 @@ void TensorIteratorOp::copyResult(const CUDA::Stream& stream,
                                   const std::int64_t iter,
                                   const std::size_t resultIdx,
                                   const std::size_t outputIdx) const {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    std::cout << "TensorIteratorOp::copyResult()\n";
+
     auto& memoryManager = *memory_manager_;
     const auto resultSize = results_info_[resultIdx].size_;
     const std::size_t outputSize = outputs_info_[outputIdx].size_;
@@ -354,6 +374,9 @@ void TensorIteratorOp::copyResult(const CUDA::Stream& stream,
         auto inTensors = memoryManager.inputTensorPointers(*result, mutableBuffer);
         const auto output = outputTensors[outputIdx];
         OPENVINO_ASSERT(resultSize == outputSize, "Node name: ", GetName());
+
+        std::cout << "stream.transfer()\n";
+
         stream.transfer(output, inTensors[0], outputSize);
     } else {
         auto output = outputTensors[outputIdx];
@@ -370,8 +393,12 @@ void TensorIteratorOp::copyResult(const CUDA::Stream& stream,
             start = portMap.start;
         }
         start += iter * portMap.stride;
+
+        std::cout << "insert()\n";
+
         insert(stream.get(), inputTensors[0].get(), output.get(), start);
     }
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 void TensorIteratorOp::updateExecSequence() {
