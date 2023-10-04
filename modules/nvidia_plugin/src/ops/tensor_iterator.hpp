@@ -27,6 +27,8 @@ public:
                  Outputs outputTensors,
                  const Workbuffers& workbuffers) const override;
 
+    void ExecuteGraph(const InferenceRequestContext& context, std::size_t graphIndex);
+
     bool IsCudaGraphCompatible() const override;
 
     void Capture(InferenceRequestContext& context,

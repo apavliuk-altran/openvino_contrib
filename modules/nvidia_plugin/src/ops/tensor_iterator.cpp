@@ -191,15 +191,79 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     }
 }
 
+void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context, std::size_t graphIndex) {
+    const auto& stream = context.getThreadContext().stream();
+    for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+        const_cast<InferenceRequestContext&>(context).getCudaGraphContext().update_capture(context.getTensorMappingContext());
+        context.getCudaGraphContext().launch(graphIndex, stream);
+    }
+}
+
 // TODO: Investigate problem with multi-graphs in some networks
 // benchmark_app may hang in throughput mode
-bool TensorIteratorOp::IsCudaGraphCompatible() const { return false; }
+
+// bool TensorIteratorOp::IsCudaGraphCompatible() const { return false; }
+
+bool TensorIteratorOp::IsCudaGraphCompatible() const {
+    return SubGraph::IsCudaGraphCompatible();
+}
 
 void TensorIteratorOp::Capture(InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
-    Execute(context, inputTensors, outputTensors, workbuffers);
+    // Execute(context, inputTensors, outputTensors, workbuffers);
+    const auto& stream = context.getThreadContext().stream();
+    const auto& memoryManager = *memory_manager_;
+    auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
+    auto& cancellationToken = context.getCancellationToken();
+    auto& executionDelegator = context.getExecutionDelegator();
+    executionDelegator.set_stream(stream);
+
+    // First iteration
+    for (const auto inputIdx : invariant_inputs_) {
+        const auto paramIdx = inputs_parameters_map_.at(inputIdx);
+        copyParam(stream, mutableBuffer, inputTensors, 0, inputIdx, paramIdx);
+    }
+    for (const auto& [inputIdx, paramIdx] : inputs_parameters_map_) {
+        if (portmap_inputs_.count(inputIdx) == 0) {
+            copyParam(stream, mutableBuffer, inputTensors, 0, inputIdx, paramIdx);
+        }
+    }
+
+    // for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+    int64_t iter = 0;
+
+        // Input mapping of ports
+        for (auto& it : portmap_inputs_) {
+            const auto& inputIdx = it.first;
+            const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+            copyParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
+        }
+
+        // Inner loop
+        executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
+
+        // Back-edge mapping
+        for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+            copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+        }
+
+        // Output mapping of ports
+        for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+            if (portmap_outputs_.count(outputIdx) > 0) {
+                copyResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+            }
+        }
+
+        // Copy data to output
+        if (iterations_results_map_.count(iter) > 0) {
+            for (const auto& resultIdx : iterations_results_map_.at(iter)) {
+                const auto& outputIdx = results_outputs_map_.at(resultIdx);
+                copyResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+            }
+        }
+    // }
 }
 
 WorkbufferRequest TensorIteratorOp::GetWorkBufferRequest() const {

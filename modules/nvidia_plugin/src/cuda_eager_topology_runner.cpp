@@ -8,7 +8,11 @@ namespace ov {
 namespace nvidia_gpu {
 
 EagerTopologyRunner::EagerTopologyRunner(const CreationContext& context, const std::shared_ptr<const ov::Model>& model)
-    : SubGraph(context, model) {}
+    : SubGraph(context, model) {
+    std::cout << "--------------------------------------------------------------\n";
+    std::cout << "EagerTopologyRunner::EagerTopologyRunner()\n";
+    std::cout << "--------------------------------------------------------------\n";
+}
 
 void EagerTopologyRunner::Run(const InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const {
     Workbuffers workbuffers{};

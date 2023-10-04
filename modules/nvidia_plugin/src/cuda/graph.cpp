@@ -123,11 +123,11 @@ DownloadNode CaptureInfo::addDownloadNode(void *dst, DevicePointer<const void*> 
 }
 
 void UploadNode::update_src(const GraphExec& exec, const void *src) {
-    if (src_ != src) {
+    // if (src_ != src) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
                 dst_.get(), src, size_, cudaMemcpyHostToDevice));
         src_ = src;
-    }
+    // }
 }
 
 UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src,
@@ -139,11 +139,11 @@ UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const voi
 }
 
 void DownloadNode::update_dst(const GraphExec& exec, void *dst) {
-    if (dst_ != dst) {
+    // if (dst_ != dst) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
                 dst, src_.get(), size_, cudaMemcpyDeviceToHost));
         dst_ = dst;
-    }
+    // }
 }
 
 DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src,

@@ -5,14 +5,32 @@
 #include "cuda_graph_topology_runner.hpp"
 
 #include "cuda/event.hpp"
+#include "ops/tensor_iterator.hpp"
 
 namespace ov {
 namespace nvidia_gpu {
+
+namespace {
+
+std::shared_ptr<TensorIteratorOp> getTI(const SubGraph& sg) {
+    auto& seq = sg.getExecSequence();
+    if (seq.size() != 1) {
+        return nullptr;
+    }
+    return std::dynamic_pointer_cast<TensorIteratorOp>(seq[0]);
+}
+
+} // namespace
+
 
 CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
                                                  const std::shared_ptr<const ov::Model>& model)
     : orig_subgraph_{context, model},
       cuda_graphs_count_{0} {
+    std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    std::cout << "CudaGraphTopologyRunner::CudaGraphTopologyRunner()\n";
+    std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+
     std::vector<SubGraph::ExecSequence> sequences;
     SubGraph::ExecSequence currentSequence;
     const auto& origSequence = orig_subgraph_.getExecSequence();
@@ -23,7 +41,11 @@ CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
     currentSequence.push_back(origSequence[0]);
     for (size_t i = 1; i < totalSize; ++i) {
         const auto& op = origSequence[i];
-        if (op->IsCudaGraphCompatible() != isLastOpCompatible) {
+        if (std::dynamic_pointer_cast<const TensorIteratorOp>(op)) {
+            isLastOpCompatible = !isLastOpCompatible;
+            sequences.emplace_back(std::move(currentSequence));
+            currentSequence.clear();
+        } else if (op->IsCudaGraphCompatible() != isLastOpCompatible) {
             isLastOpCompatible = !isLastOpCompatible;
             sequences.emplace_back(std::move(currentSequence));
             currentSequence.clear();
@@ -45,7 +67,9 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
     const auto& stream = context.getThreadContext().stream();
     std::size_t graphIndex = 0;
     for (auto& subgraph : subgraphs_) {
-        if (subgraph.IsCudaGraphCompatible()) {
+        if (auto ti = getTI(subgraph)) {
+            ti->ExecuteGraph(context, graphIndex);
+        } else if (subgraph.IsCudaGraphCompatible()) {
             context.getCudaGraphContext().launch(graphIndex, stream);
             graphIndex++;
         } else {
@@ -58,12 +82,14 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
 
 void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
                                       const DeviceMemBlock& memoryBlock) const {
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
     const auto& stream = context.getThreadContext().stream();
     auto& graphContext = context.getCudaGraphContext();
 
     graphContext.reset();
     for (const auto& subgraph : subgraphs_) {
-        if (subgraph.IsCudaGraphCompatible()) {
+        if (getTI(subgraph) || subgraph.IsCudaGraphCompatible()) {
             graphContext.start_next_graph_addition();
             CUDA::GraphCapture capture{stream};
             {
@@ -78,6 +104,12 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
     }
     OPENVINO_ASSERT(graphContext.get_graphs_count() == GetCudaGraphsCount(),
                     "CudaGraphTopologyRunner/CudaGraphContext graphs count mismatch");
+
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    std::cout << "CudaGraphTopologyRunner::Capture(): " <<
+                 std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms\n";
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 const SubGraph& CudaGraphTopologyRunner::GetSubGraph() const {
