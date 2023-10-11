@@ -122,6 +122,21 @@ DownloadNode CaptureInfo::addDownloadNode(void *dst, DevicePointer<const void*> 
     return DownloadNode{newNode, dst, src, size};
 }
 
+TransferNode CaptureInfo::addTransferNode(CUDA::DevicePointer<void *> dst,
+                                          CUDA::DevicePointer<const void *> src,
+                                          std::size_t size) {
+    cudaGraphNode_t newNode;
+    throwIfError(cudaGraphAddMemcpyNode1D(&newNode, capturingGraph_, deps_, depCount_,
+            dst.get(), src.get(), size, cudaMemcpyDeviceToDevice));
+    throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
+    return TransferNode{newNode, dst, src, size};
+}
+
+InsertNode CaptureInfo::addInsertNode(const ov::nvidia_gpu::kernel::Insert::Params& insertParams) {
+    cudaGraphNode_t newNode;
+    return InsertNode{newNode, insertParams};
+}
+
 void UploadNode::update_src(const GraphExec& exec, const void *src) {
     // if (src_ != src) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
@@ -154,6 +169,31 @@ DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const 
       size_{size} {
 }
 
+void CUDA::TransferNode::update_ptrs(const GraphExec &exec, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src) {
+    if (dst_ != dst && src_ != src) {
+        throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
+                dst.get(), src_.get(), size_, cudaMemcpyDeviceToDevice));
+        dst_ = dst;
+        src_ = src;
+    }
+}
+
+CUDA::TransferNode::TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src, std::size_t size)
+    : node_{node},
+      dst_{dst},
+      src_{src},
+      size_{size} {
+}
+
+void CUDA::InsertNode::update_params(const GraphExec &exec, const ov::nvidia_gpu::kernel::Insert::Params& insertParams) {
+    insert_params_ = insertParams;
+    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, insert_params_.getKnp()));
+}
+
+CUDA::InsertNode::InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams)
+    : node_{node},
+      insert_params_{kernelParams} {}
+
 bool UploadNode::operator ==(const UploadNode &rhs) const {
     return size_ == rhs.size_ && src_ == rhs.src_ && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
 }
@@ -161,5 +201,15 @@ bool UploadNode::operator ==(const UploadNode &rhs) const {
 bool DownloadNode::operator ==(const DownloadNode &rhs) const {
     return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_ == rhs.dst_ && node_ == rhs.node_;
 }
+
+bool CUDA::TransferNode::operator==(const TransferNode &rhs) const
+{
+    return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
+}
+
+// bool CUDA::InsertNode::operator==(const InsertNode &rhs) const
+// {
+//     return insert_params_ == rhs.insert_params_ && node_ == rhs.node_;
+// }
 
 } // namespace CUDA

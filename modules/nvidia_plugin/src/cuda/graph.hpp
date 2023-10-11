@@ -8,6 +8,8 @@
 
 #include "runtime.hpp"
 
+#include "kernels/insert.hpp"
+
 namespace CUDA {
 
 class GraphCapture;
@@ -113,11 +115,43 @@ private:
     std::size_t size_;
 };
 
+class TransferNode {
+    friend CaptureInfo;
+
+public:
+    void update_ptrs(const GraphExec &exec, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src);
+    bool operator==(const TransferNode& rhs) const;
+
+private:
+    TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void*> dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    cudaGraphNode_t node_;
+    CUDA::DevicePointer<void*> dst_;
+    CUDA::DevicePointer<const void*> src_;
+    std::size_t size_;
+};
+
+class InsertNode {
+    friend CaptureInfo;
+
+public:
+    void update_params(const GraphExec& exec, const ov::nvidia_gpu::kernel::Insert::Params& insertParams);
+    // bool operator==(const InsertNode& rhs) const;
+
+private:
+    InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams);
+    cudaGraphNode_t node_;
+    ov::nvidia_gpu::kernel::Insert::Params insert_params_;
+    cudaKernelNodeParams knp_;
+
+};
+
 class CaptureInfo {
 public:
     CaptureInfo(const Stream& capturedStream);
     UploadNode addUploadNode(CUDA::DevicePointer<void*> dst, const void* src, std::size_t size);
     DownloadNode addDownloadNode(void* dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    TransferNode addTransferNode(CUDA::DevicePointer<void*> dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    InsertNode addInsertNode(const ov::nvidia_gpu::kernel::Insert::Params& insertParams);
 
 private:
     const Stream& stream_;

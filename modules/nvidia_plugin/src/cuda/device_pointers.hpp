@@ -19,7 +19,8 @@ namespace CUDA {
  */
 
 template <typename T>
-class DevicePointer : private gsl::not_null<T> {
+// class DevicePointer : private gsl::not_null<T> {
+class DevicePointer : public gsl::not_null<T> {
 public:
     static_assert(std::is_pointer<T>::value, "T should be a pointer type");
     explicit DevicePointer(gsl::not_null<T> o) noexcept : gsl::not_null<T>{o} {}
