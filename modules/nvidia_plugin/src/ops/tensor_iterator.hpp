@@ -48,22 +48,34 @@ private:
     WorkbufferRequest GetWorkBufferRequest() const override;
     void InitSharedImmutableWorkbuffers(const Buffers& buffers) override;
 
-    void copyParam(const CUDA::Stream& stream,
-                   CUDA::DevicePointer<void*> mutableBuffer,
-                   const IOperationExec::Inputs& inputTensors,
-                   std::int64_t iter,
-                   uint64_t inputIdx,
-                   uint64_t paramIdx) const;
+    void transferParam(const CUDA::Stream& stream,
+                       CUDA::DevicePointer<void*> mutableBuffer,
+                       const IOperationExec::Inputs& inputTensors,
+                       std::int64_t iter,
+                       uint64_t inputIdx,
+                       uint64_t paramIdx) const;
+    void sliceParam(const CUDA::Stream& stream,
+                    CUDA::DevicePointer<void*> mutableBuffer,
+                    const IOperationExec::Inputs& inputTensors,
+                    std::int64_t iter,
+                    uint64_t inputIdx,
+                    uint64_t paramIdx) const;
     void copyBackEdge(const CUDA::Stream& stream,
                       CUDA::DevicePointer<void*> mutableBuffer,
                       uint64_t resultIdx,
                       uint64_t paramIdx) const;
-    void copyResult(const CUDA::Stream& stream,
-                    CUDA::DevicePointer<void*> mutableBuffer,
-                    const IOperationExec::Outputs& outputTensors,
-                    int64_t iter,
-                    std::size_t resultIdx,
-                    std::size_t outputIdx) const;
+    void transferResult(const CUDA::Stream& stream,
+                        CUDA::DevicePointer<void*> mutableBuffer,
+                        const IOperationExec::Outputs& outputTensors,
+                        int64_t iter,
+                        std::size_t resultIdx,
+                        std::size_t outputIdx) const;
+    void insertResult(const CUDA::Stream& stream,
+                      CUDA::DevicePointer<void*> mutableBuffer,
+                      const IOperationExec::Outputs& outputTensors,
+                      int64_t iter,
+                      std::size_t resultIdx,
+                      std::size_t outputIdx) const;
 
     void updateExecSequence();
 
