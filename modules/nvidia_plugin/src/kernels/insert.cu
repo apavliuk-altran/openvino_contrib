@@ -82,6 +82,65 @@ void Insert::call(const cudaStream_t stream, const void* src, void* dst, const s
         static_cast<const Props*>(props_ptr_), start, size_, static_cast<const T*>(src), static_cast<T*>(dst));
 }
 
+Insert::Params Insert::getParams(const void* src, void* dst, const size_t start) const {
+    Params p;
+    switch (element_type_) {
+        case Type_t::boolean:
+            // TODO: get rid of C-cast
+            p.kernel = (void*)&insert_part<bool>;
+            break;
+#ifdef CUDA_HAS_BF16_TYPE
+        case Type_t::bf16:
+            p.kernel = (void*)&insert_part<__nv_bfloat16>;
+            break;
+#endif
+        case Type_t::f16:
+            p.kernel = (void*)&insert_part<__half>;
+            break;
+        case Type_t::f32:
+            p.kernel = (void*)&insert_part<float>;
+            break;
+        case Type_t::f64:
+            p.kernel = (void*)&insert_part<double>;
+            break;
+        case Type_t::i8:
+            p.kernel = (void*)&insert_part<int8_t>;
+            break;
+        case Type_t::i16:
+            p.kernel = (void*)&insert_part<int16_t>;
+            break;
+        case Type_t::i32:
+            p.kernel = (void*)&insert_part<int32_t>;
+            break;
+        case Type_t::i64:
+            p.kernel = (void*)&insert_part<int64_t>;
+            break;
+        case Type_t::u8:
+            p.kernel = (void*)&insert_part<uint8_t>;
+            break;
+        case Type_t::u16:
+            p.kernel = (void*)&insert_part<uint16_t>;
+            break;
+        case Type_t::u32:
+            p.kernel = (void*)&insert_part<uint32_t>;
+            break;
+        case Type_t::u64:
+            p.kernel = (void*)&insert_part<uint64_t>;
+            break;
+        default:
+            throw_ov_exception(fmt::format("Input element type = {} is not supported by Split operation !!",
+                                         static_cast<Type_t>(element_type_)));
+    }
+    p.num_blocks = num_blocks_;
+    p.threads_per_block = threads_per_block_;
+    p.props = static_cast<const Props*>(props_ptr_);
+    p.start = start;
+    p.size = size_;
+    p.x = src;
+    p.y = dst;
+    return p;
+}
+
 }  // namespace kernel
 }  // namespace nvidia_gpu
 }  // namespace ov
