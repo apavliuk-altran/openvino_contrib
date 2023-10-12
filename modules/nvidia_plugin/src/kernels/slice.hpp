@@ -20,11 +20,55 @@ public:
         size_t axe;
     };
 
+    struct Params {
+        inline const cudaKernelNodeParams* getKnp() {
+            knp_.func = kernel;
+            knp_.gridDim = num_blocks;
+            knp_.blockDim = threads_per_block;
+            knp_.sharedMemBytes = 0;
+            args_[0] = &props;
+            args_[1] = &start;
+            args_[2] = &size;
+            args_[3] = &x;
+            args_[4] = &y;
+            knp_.kernelParams = &args_[0];
+            knp_.extra = nullptr;
+            return &knp_;
+        }
+
+        // inline operator==(const Params& rhs) {
+        //     return kernel == rhs.kernel &&
+        //            num_blocks == rhs.num_blocks &&
+        //            threads_per_block == rhs.threads_per_block &&
+        //            props == rhs.props &&
+        //            start == rhs.start &&
+        //            size == rhs.size &&
+        //            x == rhs.x &&
+        //            y == rhs.y &&
+        //            knp == rhs.knp_
+        // }
+
+        void* kernel;
+        size_t num_blocks;
+        size_t threads_per_block;
+        const Props* props;
+        size_t start;
+        size_t size;
+        const void* x;
+        void* y;
+
+    private:
+        void* args_[5];
+        cudaKernelNodeParams knp_;
+    };
+
     Slice(Type_t element_type, const Props& props, size_t max_threads_per_block);
     Slice(Slice&&) = default;
     Slice& operator=(Slice&&) = default;
 
     void operator()(cudaStream_t stream, const void* src, void* dst, size_t start) const;
+
+    Params getParams(const void* src, void* dst, const size_t start) const;
 
     size_t getImmutableWorkbufferSize() const;
     void setImmutableWorkbuffer(void* immutableBuffer);

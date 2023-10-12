@@ -192,24 +192,37 @@ void CUDA::InsertNode::update_params(const GraphExec &exec, const ov::nvidia_gpu
 
 CUDA::InsertNode::InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams)
     : node_{node},
-      insert_params_{kernelParams} {}
+      insert_params_{kernelParams} {
+}
 
-bool UploadNode::operator ==(const UploadNode &rhs) const {
+void CUDA::SliceNode::update_params(const GraphExec &exec, const ov::nvidia_gpu::kernel::Slice::Params& sliceParams) {
+    slice_params_ = sliceParams;
+    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, slice_params_.getKnp()));
+}
+
+CUDA::SliceNode::SliceNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Slice::Params& kernelParams)
+    : node_{node},
+      slice_params_{kernelParams} {
+}
+
+bool UploadNode::operator==(const UploadNode &rhs) const {
     return size_ == rhs.size_ && src_ == rhs.src_ && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
 }
 
-bool DownloadNode::operator ==(const DownloadNode &rhs) const {
+bool DownloadNode::operator==(const DownloadNode &rhs) const {
     return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_ == rhs.dst_ && node_ == rhs.node_;
 }
 
-bool CUDA::TransferNode::operator==(const TransferNode &rhs) const
-{
+bool CUDA::TransferNode::operator==(const TransferNode &rhs) const {
     return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
 }
 
-// bool CUDA::InsertNode::operator==(const InsertNode &rhs) const
-// {
+// bool CUDA::InsertNode::operator==(const InsertNode &rhs) const {
 //     return insert_params_ == rhs.insert_params_ && node_ == rhs.node_;
+// }
+
+// bool CUDA::SliceNode::operator==(const SliceNode &rhs) const {
+//     return slice_params_ == rhs.slice_params_ && node_ == rhs.node_;
 // }
 
 } // namespace CUDA

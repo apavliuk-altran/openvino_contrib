@@ -9,6 +9,7 @@
 #include "runtime.hpp"
 
 #include "kernels/insert.hpp"
+#include "kernels/slice.hpp"
 
 namespace CUDA {
 
@@ -141,6 +142,21 @@ private:
     InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams);
     cudaGraphNode_t node_;
     ov::nvidia_gpu::kernel::Insert::Params insert_params_;
+    cudaKernelNodeParams knp_;
+
+};
+
+class SliceNode {
+    friend CaptureInfo;
+
+public:
+    void update_params(const GraphExec& exec, const ov::nvidia_gpu::kernel::Slice::Params& insertParams);
+    // bool operator==(const InsertNode& rhs) const;
+
+private:
+    SliceNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Slice::Params& kernelParams);
+    cudaGraphNode_t node_;
+    ov::nvidia_gpu::kernel::Slice::Params slice_params_;
     cudaKernelNodeParams knp_;
 
 };
