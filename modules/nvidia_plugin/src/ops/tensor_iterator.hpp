@@ -45,6 +45,26 @@ private:
         int64_t axis{0};
     };
 
+    class SliceLauncher {
+    public:
+        SliceLauncher(const TensorIteratorOp& ti,
+                      const CUDA::Stream& stream,
+                      const CUDA::DevicePointer<void*> mutableBuffer,
+                      const IOperationExec::Inputs& inputTensors,
+                      const uint64_t inputIdx,
+                      const uint64_t paramIdx);
+
+        void operator()(int64_t iter) const;
+
+    private:
+        cudaStream_t stream_;
+        const void* src_;
+        void* dst_;
+        size_t start_;
+        int64_t stride_;
+        const kernel::Slice& slice_;
+    };
+
     WorkbufferRequest GetWorkBufferRequest() const override;
     void InitSharedImmutableWorkbuffers(const Buffers& buffers) override;
 

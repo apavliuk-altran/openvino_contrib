@@ -157,13 +157,27 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
         }
     }
 
+    std::vector<SliceLauncher> slices;
+    slices.reserve(portmap_inputs_.size());
+    // Input mapping of ports
+    for (auto& it : portmap_inputs_) {
+        const auto& inputIdx = it.first;
+        const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+        // sliceParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
+        slices.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+    }
+
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
 
-        // Input mapping of ports
-        for (auto& it : portmap_inputs_) {
-            const auto& inputIdx = it.first;
-            const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-            sliceParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
+        // // Input mapping of ports
+        // for (auto& it : portmap_inputs_) {
+        //     const auto& inputIdx = it.first;
+        //     const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+        //     sliceParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
+        // }
+
+        for (const auto& slice : slices) {
+            slice(iter);
         }
 
         // Inner loop
@@ -272,6 +286,49 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     //         }
     //     }
     // // }
+}
+
+TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
+                                               const CUDA::Stream& stream,
+                                               const CUDA::DevicePointer<void*> mutableBuffer,
+                                               const IOperationExec::Inputs& inputTensors,
+                                               const uint64_t inputIdx,
+                                               const uint64_t paramIdx)
+    : slice_{ti.kernelmap_inputs_.at(inputIdx)} {
+    std::cout << "---------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::sliceParam()\n";
+
+    OPENVINO_ASSERT(ti.portmap_inputs_.count(inputIdx) != 0, "Node name: ", ti.GetName());
+    auto& memoryManager = *ti.memory_manager_;
+    const std::size_t inputSize = ti.inputs_info_[inputIdx].size_;
+    const std::size_t paramSize = ti.params_info_[paramIdx].size_;
+
+    const auto& portMap = ti.portmap_inputs_.at(inputIdx);
+    const auto& param = ti.params_[paramIdx];
+    auto outputTensors = memoryManager.outputTensorPointers(*param, mutableBuffer);
+    const auto inputShape = ti.inputs_info_[inputIdx].shape_;
+
+    // const auto& slice = kernelmap_inputs_.at(inputIdx);
+    std::size_t start;
+    if (portMap.start < 0) {
+        start = inputShape[portMap.axis] + portMap.start;
+    } else {
+        start = portMap.start;
+    }
+    // start += iter * portMap.stride;
+    auto input = inputTensors[inputIdx];
+
+    stream_ = stream.get();
+    src_ = input.get();
+    dst_ = outputTensors[0].get();
+    start_ = start;
+    stride_ = portMap.stride;
+
+    std::cout << "---------------------------------------------------------------------------------------\n";
+}
+
+void TensorIteratorOp::SliceLauncher::operator()(std::int64_t iter) const {
+    slice_(stream_, src_, dst_, start_ + iter * stride_);
 }
 
 WorkbufferRequest TensorIteratorOp::GetWorkBufferRequest() const {
