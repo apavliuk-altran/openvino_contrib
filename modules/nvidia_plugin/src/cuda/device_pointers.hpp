@@ -19,8 +19,7 @@ namespace CUDA {
  */
 
 template <typename T>
-// class DevicePointer : private gsl::not_null<T> {
-class DevicePointer : public gsl::not_null<T> {
+class DevicePointer : private gsl::not_null<T> {
 public:
     static_assert(std::is_pointer<T>::value, "T should be a pointer type");
     explicit DevicePointer(gsl::not_null<T> o) noexcept : gsl::not_null<T>{o} {}
@@ -51,6 +50,16 @@ auto operator+(DevicePointer<T*> p, std::ptrdiff_t d) noexcept {
 template <typename T, typename std::enable_if<std::is_void<T>::value>::type* = nullptr>
 auto operator-(DevicePointer<T*> l, DevicePointer<T*> r) noexcept {
     return static_cast<const char*>(l.get()) - static_cast<const char*>(r);
+}
+
+template <typename T, typename U>
+bool operator==(const DevicePointer<T*>& lhs, const DevicePointer<U*>& rhs) {
+    return lhs.get() == rhs.get();
+}
+
+template <typename T, typename U>
+bool operator!=(const DevicePointer<T*>& lhs, const DevicePointer<U*>& rhs) {
+    return lhs.get() != rhs.get();
 }
 
 template <typename T, std::size_t Extent = gsl::dynamic_extent>
