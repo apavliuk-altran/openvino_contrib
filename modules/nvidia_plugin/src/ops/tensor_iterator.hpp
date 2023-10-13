@@ -54,7 +54,9 @@ private:
                       const uint64_t inputIdx,
                       const uint64_t paramIdx);
 
-        void operator()(int64_t iter) const;
+        inline void operator()(int64_t iter) const {
+            slice_(stream_, src_, dst_, start_ + iter * stride_);
+        }
 
     private:
         cudaStream_t stream_;
@@ -63,6 +65,51 @@ private:
         size_t start_;
         int64_t stride_;
         const kernel::Slice& slice_;
+    };
+
+    class TransferLauncher {
+    public:
+        TransferLauncher(const TensorIteratorOp& ti,
+                         const CUDA::Stream& stream,
+                         CUDA::DevicePointer<void*> mutableBuffer,
+                         uint64_t resultIdx,
+                         uint64_t paramIdx);
+
+        inline void operator()() const {
+            // stream_.transfer(dst_, src_, count_);
+            throwIfError(cudaMemcpyAsync(dst_, src_, count_, cudaMemcpyDeviceToDevice, stream_));
+        }
+
+    private:
+        // const CUDA::Stream& stream_;
+        // CUDA::DevicePointer<void*> dst_;
+        // CUDA::DevicePointer<const void*> src_;
+        cudaStream_t stream_;
+        const void* src_;
+        void* dst_;
+        std::size_t count_;
+    };
+
+    class InsertLauncher {
+    public:
+        InsertLauncher(const TensorIteratorOp& ti,
+                       const CUDA::Stream& stream,
+                       CUDA::DevicePointer<void*> mutableBuffer,
+                       const IOperationExec::Outputs& outputTensors,
+                       const std::size_t resultIdx,
+                       const std::size_t outputIdx);
+
+        inline void operator()(int64_t iter) const {
+            insert_(stream_, src_, dst_, start_ + iter * stride_);
+        }
+
+    private:
+        cudaStream_t stream_;
+        const void* src_;
+        void* dst_;
+        size_t start_;
+        int64_t stride_;
+        const kernel::Insert& insert_;
     };
 
     WorkbufferRequest GetWorkBufferRequest() const override;

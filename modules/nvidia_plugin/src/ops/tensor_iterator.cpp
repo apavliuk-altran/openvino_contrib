@@ -163,11 +163,28 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     for (auto& it : portmap_inputs_) {
         const auto& inputIdx = it.first;
         const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-        // sliceParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
         slices.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
     }
 
-    for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+    std::vector<TransferLauncher> transfers;
+    transfers.reserve(results_parameters_map_.size());
+    // Back-edge mapping
+    for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+        // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+        transfers.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+    }
+
+    std::vector<InsertLauncher> inserts;
+    inserts.reserve(results_outputs_map_.size());
+    // Output mapping of ports
+    for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+        if (portmap_outputs_.count(outputIdx) > 0) {
+            // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+            inserts.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+        }
+    }
+
+    // for (int64_t iter = 0; iter < num_iterations_; ++iter) {
 
         // // Input mapping of ports
         // for (auto& it : portmap_inputs_) {
@@ -176,24 +193,20 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
         //     sliceParam(stream, mutableBuffer, inputTensors, iter, inputIdx, paramIdx);
         // }
 
-        for (const auto& slice : slices) {
-            slice(iter);
-        }
+        // // Inner loop
+        // executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
 
-        // Inner loop
-        executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
+        // // Back-edge mapping
+        // for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+        //     copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+        // }
 
-        // Back-edge mapping
-        for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
-            copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
-        }
-
-        // Output mapping of ports
-        for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
-            if (portmap_outputs_.count(outputIdx) > 0) {
-                insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
-            }
-        }
+        // // Output mapping of ports
+        // for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+        //     if (portmap_outputs_.count(outputIdx) > 0) {
+        //         insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+        //     }
+        // }
 
         // // Copy data to output
         // if (iterations_results_map_.count(iter) > 0) {
@@ -202,6 +215,27 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
         //         transferResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
         //     }
         // }
+    // }
+
+    for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+
+        // // Input mapping of ports
+        for (const auto& slice : slices) {
+            slice(iter);
+        }
+
+        // Inner loop
+        executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
+
+        // // Back-edge mapping
+        for (const auto& transfer : transfers) {
+            transfer();
+        }
+
+        // // Output mapping of ports
+        for (const auto& insert : inserts) {
+            insert(iter);
+        }
     }
 
     // Copy data to output
@@ -296,7 +330,7 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
                                                const uint64_t paramIdx)
     : slice_{ti.kernelmap_inputs_.at(inputIdx)} {
     std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::sliceParam()\n";
+    std::cout << "SliceLauncher::SliceLauncher()\n";
 
     OPENVINO_ASSERT(ti.portmap_inputs_.count(inputIdx) != 0, "Node name: ", ti.GetName());
     auto& memoryManager = *ti.memory_manager_;
@@ -327,8 +361,73 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
     std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
-void TensorIteratorOp::SliceLauncher::operator()(std::int64_t iter) const {
-    slice_(stream_, src_, dst_, start_ + iter * stride_);
+TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
+                                                     const CUDA::Stream& stream,
+                                                     CUDA::DevicePointer<void*> mutableBuffer,
+                                                     uint64_t resultIdx,
+                                                     uint64_t paramIdx)
+    // : stream_{stream} {
+{
+    std::cout << "=======================================================================================\n";
+    std::cout << "TransferLauncher::TransferLauncher()\n";
+
+    auto& memoryManager = *ti.memory_manager_;
+    const auto& result = ti.results_[resultIdx];
+    const auto& param = ti.params_[paramIdx];
+    auto paramTensors = memoryManager.outputTensorPointers(*param, mutableBuffer);
+    auto resultTensors = memoryManager.inputTensorPointers(*result, mutableBuffer);
+    const std::size_t paramSize = ti.params_info_[paramIdx].size_;
+    const std::size_t resultSize = ti.results_info_[resultIdx].size_;
+    OPENVINO_ASSERT(paramSize == resultSize, "Node name: ", ti.GetName());
+
+    // stream.transfer(paramTensors[0], resultTensors[0], paramSize);
+    stream_ = stream.get();
+    dst_ = paramTensors[0].get();
+    src_ = resultTensors[0].get();
+    count_ = paramSize;
+
+    std::cout << "=======================================================================================\n";
+}
+
+TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
+                                                 const CUDA::Stream& stream,
+                                                 CUDA::DevicePointer<void*> mutableBuffer,
+                                                 const IOperationExec::Outputs& outputTensors,
+                                                 const std::size_t resultIdx,
+                                                 const std::size_t outputIdx)
+    : insert_{ti.kernelmap_outputs_.at(outputIdx)} {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    std::cout << "InsertLauncher::InsertLauncher()\n";
+
+    OPENVINO_ASSERT(ti.portmap_outputs_.count(outputIdx) != 0, "Node name: ", ti.GetName());
+    auto& memoryManager = *ti.memory_manager_;
+    const auto resultSize = ti.results_info_[resultIdx].size_;
+    const std::size_t outputSize = ti.outputs_info_[outputIdx].size_;
+
+    auto output = outputTensors[outputIdx];
+    const auto& result = ti.results_[resultIdx];
+    auto inputTensors = memoryManager.inputTensorPointers(*result, mutableBuffer);
+    const auto portMap = ti.portmap_outputs_.at(outputIdx);
+    const auto outputShape = ti.outputs_info_[outputIdx].shape_;
+
+    // const auto& insert = ti.kernelmap_outputs_.at(outputIdx);
+    std::size_t start;
+    if (portMap.start < 0) {
+        start = outputShape[portMap.axis] + portMap.start;
+    } else {
+        start = portMap.start;
+    }
+    // start += iter * portMap.stride;
+
+    // insert(stream.get(), inputTensors[0].get(), output.get(), start);
+
+    stream_ = stream.get();
+    src_ = inputTensors[0].get();
+    dst_ = output.get();
+    start_ = start;
+    stride_ = portMap.stride;
+
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 WorkbufferRequest TensorIteratorOp::GetWorkBufferRequest() const {
