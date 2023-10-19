@@ -89,7 +89,7 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
 
 void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
                                       const DeviceMemBlock& memoryBlock) const {
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
     const auto& stream = context.getThreadContext().stream();
     auto& graphContext = context.getCudaGraphContext();
@@ -116,11 +116,11 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
     // OPENVINO_ASSERT(graphContext.get_graphs_count() == GetCudaGraphsCount(),
     //                 "CudaGraphTopologyRunner/CudaGraphContext graphs count mismatch");
 
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
-    std::cout << "CudaGraphTopologyRunner::Capture(): " <<
-                 std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms\n";
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "CudaGraphTopologyRunner::Capture(): " <<
+    //              std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 const SubGraph& CudaGraphTopologyRunner::GetSubGraph() const {

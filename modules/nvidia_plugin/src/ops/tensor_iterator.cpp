@@ -384,8 +384,8 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
                                                const uint64_t paramIdx)
     : stream_(stream),
       slice_{ti.kernelmap_inputs_.at(inputIdx)} {
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "SliceLauncher::SliceLauncher()\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "SliceLauncher::SliceLauncher()\n";
 
     OPENVINO_ASSERT(ti.portmap_inputs_.count(inputIdx) != 0, "Node name: ", ti.GetName());
     auto& memoryManager = *ti.memory_manager_;
@@ -412,7 +412,7 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
     start_ = start;
     stride_ = portMap.stride;
 
-    std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
@@ -421,8 +421,8 @@ TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
                                                      uint64_t resultIdx,
                                                      uint64_t paramIdx)
     : stream_(stream) {
-    std::cout << "=======================================================================================\n";
-    std::cout << "TransferLauncher::TransferLauncher()\n";
+    // std::cout << "=======================================================================================\n";
+    // std::cout << "TransferLauncher::TransferLauncher()\n";
 
     auto& memoryManager = *ti.memory_manager_;
     const auto& result = ti.results_[resultIdx];
@@ -438,7 +438,7 @@ TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
     src_ = resultTensors[0].get();
     count_ = paramSize;
 
-    std::cout << "=======================================================================================\n";
+    // std::cout << "=======================================================================================\n";
 }
 
 TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
@@ -449,8 +449,8 @@ TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
                                                  const std::size_t outputIdx)
     : stream_(stream),
       insert_{ti.kernelmap_outputs_.at(outputIdx)} {
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
-    std::cout << "InsertLauncher::InsertLauncher()\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "InsertLauncher::InsertLauncher()\n";
 
     OPENVINO_ASSERT(ti.portmap_outputs_.count(outputIdx) != 0, "Node name: ", ti.GetName());
     auto& memoryManager = *ti.memory_manager_;
@@ -479,7 +479,7 @@ TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
     start_ = start;
     stride_ = portMap.stride;
 
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 WorkbufferRequest TensorIteratorOp::GetWorkBufferRequest() const {
@@ -513,8 +513,8 @@ void TensorIteratorOp::transferParam(const CUDA::Stream& stream,
                                      const std::int64_t iter,
                                      const uint64_t inputIdx,
                                      const uint64_t paramIdx) const {
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::transferParam()\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "TensorIteratorOp::transferParam()\n";
 
     OPENVINO_ASSERT(portmap_inputs_.count(inputIdx) == 0, "Node name: ", GetName());
     auto& memoryManager = *memory_manager_;
@@ -528,7 +528,7 @@ void TensorIteratorOp::transferParam(const CUDA::Stream& stream,
 
     stream.transfer(outputTensors[0], input, inputSize);
 
-    std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 void TensorIteratorOp::sliceParam(const CUDA::Stream& stream,
@@ -537,8 +537,8 @@ void TensorIteratorOp::sliceParam(const CUDA::Stream& stream,
                                   const std::int64_t iter,
                                   const uint64_t inputIdx,
                                   const uint64_t paramIdx) const {
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::sliceParam()\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "TensorIteratorOp::sliceParam()\n";
 
     OPENVINO_ASSERT(portmap_inputs_.count(inputIdx) != 0, "Node name: ", GetName());
     auto& memoryManager = *memory_manager_;
@@ -562,15 +562,15 @@ void TensorIteratorOp::sliceParam(const CUDA::Stream& stream,
 
     slice(stream.get(), input.get(), outputTensors[0].get(), start);
 
-    std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 void TensorIteratorOp::copyBackEdge(const CUDA::Stream& stream,
                                     CUDA::DevicePointer<void*> mutableBuffer,
                                     const uint64_t resultIdx,
                                     const uint64_t paramIdx) const {
-    std::cout << "=======================================================================================\n";
-    std::cout << "TensorIteratorOp::copyBackEdge()\n";
+    // std::cout << "=======================================================================================\n";
+    // std::cout << "TensorIteratorOp::copyBackEdge()\n";
 
     auto& memoryManager = *memory_manager_;
     const auto& result = results_[resultIdx];
@@ -583,7 +583,7 @@ void TensorIteratorOp::copyBackEdge(const CUDA::Stream& stream,
 
     stream.transfer(paramTensors[0], resultTensors[0], paramSize);
 
-    std::cout << "=======================================================================================\n";
+    // std::cout << "=======================================================================================\n";
 }
 
 void TensorIteratorOp::transferResult(const CUDA::Stream& stream,
@@ -592,8 +592,8 @@ void TensorIteratorOp::transferResult(const CUDA::Stream& stream,
                                       const std::int64_t iter,
                                       const std::size_t resultIdx,
                                       const std::size_t outputIdx) const {
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
-    std::cout << "TensorIteratorOp::transferResult()\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "TensorIteratorOp::transferResult()\n";
 
     OPENVINO_ASSERT(portmap_outputs_.count(outputIdx) == 0, "Node name: ", GetName());
     auto& memoryManager = *memory_manager_;
@@ -607,7 +607,7 @@ void TensorIteratorOp::transferResult(const CUDA::Stream& stream,
 
     stream.transfer(output, inTensors[0], outputSize);
 
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 void TensorIteratorOp::insertResult(const CUDA::Stream& stream,
@@ -616,8 +616,8 @@ void TensorIteratorOp::insertResult(const CUDA::Stream& stream,
                                     const std::int64_t iter,
                                     const std::size_t resultIdx,
                                     const std::size_t outputIdx) const {
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
-    std::cout << "TensorIteratorOp::insertResult()\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "TensorIteratorOp::insertResult()\n";
 
     OPENVINO_ASSERT(portmap_outputs_.count(outputIdx) != 0, "Node name: ", GetName());
     auto& memoryManager = *memory_manager_;
@@ -641,7 +641,7 @@ void TensorIteratorOp::insertResult(const CUDA::Stream& stream,
 
     insert(stream.get(), inputTensors[0].get(), output.get(), start);
 
-    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 void TensorIteratorOp::updateExecSequence() {
