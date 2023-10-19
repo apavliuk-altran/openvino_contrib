@@ -139,6 +139,10 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
+    std::cout << "---------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::Execute()\n";
+    std::cout << "---------------------------------------------------------------------------------------\n";
+
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
@@ -257,6 +261,10 @@ void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
     //     context.getCudaGraphContext().launch(graphIndex, stream);
     // }
 
+    std::cout << "---------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::ExecuteGraph()\n";
+    std::cout << "---------------------------------------------------------------------------------------\n";
+
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
     const auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
@@ -310,6 +318,10 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
+    std::cout << "---------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::Capture()\n";
+    std::cout << "---------------------------------------------------------------------------------------\n";
+
     // Execute(context, inputTensors, outputTensors, workbuffers);
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
