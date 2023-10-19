@@ -70,7 +70,7 @@ public:
 
     void operator()(cudaStream_t stream, const void* src, void* dst, size_t start) const;
 
-    Params getParams(const void* src, void* dst, const size_t start) const;
+    std::unique_ptr<Params> getParams(const void* src, void* dst, const size_t start) const;
 
     size_t getImmutableWorkbufferSize() const;
     void setImmutableWorkbuffer(void* immutableBuffer);

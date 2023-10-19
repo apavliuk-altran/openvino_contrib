@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cuda_operation_base.hpp>
+#include <cuda/graph.hpp>
 #include <kernels/insert.hpp>
 #include <kernels/slice.hpp>
 #include <openvino/op/tensor_iterator.hpp>
@@ -27,7 +28,10 @@ public:
                  Outputs outputTensors,
                  const Workbuffers& workbuffers) const override;
 
-    void ExecuteGraph(const InferenceRequestContext& context, std::size_t graphIndex);
+    void ExecuteGraph(const InferenceRequestContext& context,
+                      Inputs inputTensors,
+                      Outputs outputTensors,
+                      const Workbuffers& workbuffers);
 
     bool IsCudaGraphCompatible() const override;
 
@@ -55,16 +59,25 @@ private:
                       const uint64_t paramIdx);
 
         inline void operator()(int64_t iter) const {
-            slice_(stream_, src_, dst_, start_ + iter * stride_);
+            slice_(stream_.get(), src_, dst_, start_ + iter * stride_);
+        }
+
+        void capture() {
+            slice_node_.emplace(CUDA::CaptureInfo{stream_}.addSliceNode(slice_.getParams(src_, dst_, start_)));
+        }
+
+        inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
+            slice_node_->update_params(exec, slice_.getParams(src_, dst_, start_ + iter * stride_));
         }
 
     private:
-        cudaStream_t stream_;
+        const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         size_t start_;
         int64_t stride_;
         const kernel::Slice& slice_;
+        std::optional<CUDA::SliceNode> slice_node_;
     };
 
     class TransferLauncher {
@@ -77,17 +90,25 @@ private:
 
         inline void operator()() const {
             // stream_.transfer(dst_, src_, count_);
-            throwIfError(cudaMemcpyAsync(dst_, src_, count_, cudaMemcpyDeviceToDevice, stream_));
+            throwIfError(cudaMemcpyAsync(dst_, src_, count_, cudaMemcpyDeviceToDevice, stream_.get()));
+        }
+
+        void capture() {
+            // TODO: refactor
+            transfer_node_.emplace(CUDA::CaptureInfo{stream_}.addTransferNode(
+                CUDA::DevicePointer<void *>{dst_},
+                CUDA::DevicePointer<const void *>{src_},
+                count_));
         }
 
     private:
-        // const CUDA::Stream& stream_;
         // CUDA::DevicePointer<void*> dst_;
         // CUDA::DevicePointer<const void*> src_;
-        cudaStream_t stream_;
+        const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         std::size_t count_;
+        std::optional<CUDA::TransferNode> transfer_node_;
     };
 
     class InsertLauncher {
@@ -100,16 +121,25 @@ private:
                        const std::size_t outputIdx);
 
         inline void operator()(int64_t iter) const {
-            insert_(stream_, src_, dst_, start_ + iter * stride_);
+            insert_(stream_.get(), src_, dst_, start_ + iter * stride_);
+        }
+
+        void capture() {
+            insert_node_.emplace(CUDA::CaptureInfo{stream_}.addInsertNode(insert_.getParams(src_, dst_, start_)));
+        }
+
+        inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
+            insert_node_->update_params(exec, insert_.getParams(src_, dst_, start_ + iter * stride_));
         }
 
     private:
-        cudaStream_t stream_;
+        const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         size_t start_;
         int64_t stride_;
         const kernel::Insert& insert_;
+        std::optional<CUDA::InsertNode> insert_node_;
     };
 
     WorkbufferRequest GetWorkBufferRequest() const override;
@@ -159,6 +189,12 @@ private:
     std::unordered_map<uint64_t, PortMap> portmap_outputs_;
     std::unordered_map<uint64_t, kernel::Insert> kernelmap_outputs_;
     std::unordered_map<uint64_t, uint64_t> results_parameters_map_;
+
+    mutable std::optional<CUDA::Graph> graph_;
+    mutable std::optional<CUDA::GraphExec> graph_exec_;
+    mutable std::vector<SliceLauncher> slices_;
+    mutable std::vector<TransferLauncher> transfers_;
+    mutable std::vector<InsertLauncher> inserts_;
 };
 
 }  // namespace nvidia_gpu

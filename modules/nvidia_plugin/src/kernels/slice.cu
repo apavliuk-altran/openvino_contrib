@@ -76,8 +76,9 @@ void Slice::operator()(cudaStream_t stream, const void *src, void *dst, const si
     }
 }
 
-Slice::Params Slice::getParams(const void* src, void* dst, const size_t start) const {
-    Params p;
+std::unique_ptr<Slice::Params> Slice::getParams(const void* src, void* dst, const size_t start) const {
+    auto res = std::make_unique<Slice::Params>();
+    Params& p = *res;
     switch (element_type_) {
         case Type_t::boolean:
             // TODO: get rid of C-cast
@@ -132,7 +133,8 @@ Slice::Params Slice::getParams(const void* src, void* dst, const size_t start) c
     p.size = size_;
     p.x = src;
     p.y = dst;
-    return p;
+    // return p;
+    return res;
 }
 
 template <typename T>

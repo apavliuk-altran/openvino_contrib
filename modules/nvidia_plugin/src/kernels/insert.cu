@@ -75,8 +75,9 @@ void Insert::operator()(const cudaStream_t stream, const void* src, void* dst, c
     }
 }
 
-Insert::Params Insert::getParams(const void* src, void* dst, const size_t start) const {
-    Params p;
+std::unique_ptr<Insert::Params> Insert::getParams(const void* src, void* dst, const size_t start) const {
+    auto res = std::make_unique<Insert::Params>();
+    Params& p = *res;
     switch (element_type_) {
         case Type_t::boolean:
             // TODO: get rid of C-cast
@@ -131,7 +132,8 @@ Insert::Params Insert::getParams(const void* src, void* dst, const size_t start)
     p.size = size_;
     p.x = src;
     p.y = dst;
-    return p;
+    // return p;
+    return res;
 }
 
 template <typename T>

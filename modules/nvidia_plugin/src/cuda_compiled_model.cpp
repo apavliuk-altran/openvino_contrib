@@ -133,7 +133,8 @@ void CompiledModel::compile_model(const std::shared_ptr<const ov::Model>& model)
 
     ////////////////////////////////////
     ////////////////////////////////////
-    use_cuda_graph_ = false;
+    // use_cuda_graph_ = false;
+    use_cuda_graph_ = true;
     ////////////////////////////////////
     ////////////////////////////////////
 

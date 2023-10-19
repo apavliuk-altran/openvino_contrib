@@ -135,14 +135,14 @@ class InsertNode {
     friend CaptureInfo;
 
 public:
-    void update_params(const GraphExec& exec, const ov::nvidia_gpu::kernel::Insert::Params& insertParams);
+    void update_params(const GraphExec& exec, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
     // bool operator==(const InsertNode& rhs) const;
 
 private:
-    InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams);
+    InsertNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> kernelParams);
     cudaGraphNode_t node_;
-    ov::nvidia_gpu::kernel::Insert::Params insert_params_;
-    cudaKernelNodeParams knp_;
+    std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insert_params_;
+    // cudaKernelNodeParams knp_;
 
 };
 
@@ -150,14 +150,14 @@ class SliceNode {
     friend CaptureInfo;
 
 public:
-    void update_params(const GraphExec& exec, const ov::nvidia_gpu::kernel::Slice::Params& insertParams);
+    void update_params(const GraphExec& exec, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
     // bool operator==(const InsertNode& rhs) const;
 
 private:
-    SliceNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Slice::Params& kernelParams);
+    SliceNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> kernelParams);
     cudaGraphNode_t node_;
-    ov::nvidia_gpu::kernel::Slice::Params slice_params_;
-    cudaKernelNodeParams knp_;
+    std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> slice_params_;
+    // cudaKernelNodeParams knp_;
 
 };
 
@@ -167,7 +167,8 @@ public:
     UploadNode addUploadNode(CUDA::DevicePointer<void*> dst, const void* src, std::size_t size);
     DownloadNode addDownloadNode(void* dst, CUDA::DevicePointer<const void*> src, std::size_t size);
     TransferNode addTransferNode(CUDA::DevicePointer<void*> dst, CUDA::DevicePointer<const void*> src, std::size_t size);
-    InsertNode addInsertNode(const ov::nvidia_gpu::kernel::Insert::Params& insertParams);
+    InsertNode addInsertNode(std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+    SliceNode addSliceNode(std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
 
 private:
     const Stream& stream_;

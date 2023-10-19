@@ -132,17 +132,26 @@ TransferNode CaptureInfo::addTransferNode(CUDA::DevicePointer<void *> dst,
     return TransferNode{newNode, dst, src, size};
 }
 
-InsertNode CaptureInfo::addInsertNode(const ov::nvidia_gpu::kernel::Insert::Params& insertParams) {
+InsertNode CaptureInfo::addInsertNode(std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
     cudaGraphNode_t newNode;
-    return InsertNode{newNode, insertParams};
+    throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, insertParams->getKnp()));
+    throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
+    return InsertNode{newNode, std::move(insertParams)};
+}
+
+SliceNode CaptureInfo::addSliceNode(std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    cudaGraphNode_t newNode;
+    throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, sliceParams->getKnp()));
+    throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
+    return SliceNode{newNode, std::move(sliceParams)};
 }
 
 void UploadNode::update_src(const GraphExec& exec, const void *src) {
-    // if (src_ != src) {
+    if (src_ != src) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
                 dst_.get(), src, size_, cudaMemcpyHostToDevice));
         src_ = src;
-    // }
+    }
 }
 
 UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src,
@@ -154,11 +163,11 @@ UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const voi
 }
 
 void DownloadNode::update_dst(const GraphExec& exec, void *dst) {
-    // if (dst_ != dst) {
+    if (dst_ != dst) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
                 dst, src_.get(), size_, cudaMemcpyDeviceToHost));
         dst_ = dst;
-    // }
+    }
 }
 
 DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src,
@@ -185,24 +194,24 @@ CUDA::TransferNode::TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void 
       size_{size} {
 }
 
-void CUDA::InsertNode::update_params(const GraphExec &exec, const ov::nvidia_gpu::kernel::Insert::Params& insertParams) {
-    insert_params_ = insertParams;
-    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, insert_params_.getKnp()));
+void CUDA::InsertNode::update_params(const GraphExec &exec, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+    insert_params_ = std::move(insertParams);
+    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, insert_params_->getKnp()));
 }
 
-CUDA::InsertNode::InsertNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Insert::Params& kernelParams)
+CUDA::InsertNode::InsertNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams)
     : node_{node},
-      insert_params_{kernelParams} {
+      insert_params_{std::move(insertParams)} {
 }
 
-void CUDA::SliceNode::update_params(const GraphExec &exec, const ov::nvidia_gpu::kernel::Slice::Params& sliceParams) {
-    slice_params_ = sliceParams;
-    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, slice_params_.getKnp()));
+void CUDA::SliceNode::update_params(const GraphExec &exec, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    slice_params_ = std::move(sliceParams);
+    throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, slice_params_->getKnp()));
 }
 
-CUDA::SliceNode::SliceNode(cudaGraphNode_t node, const ov::nvidia_gpu::kernel::Slice::Params& kernelParams)
+CUDA::SliceNode::SliceNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams)
     : node_{node},
-      slice_params_{kernelParams} {
+      slice_params_{std::move(sliceParams)} {
 }
 
 bool UploadNode::operator==(const UploadNode &rhs) const {
