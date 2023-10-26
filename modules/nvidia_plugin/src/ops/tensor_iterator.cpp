@@ -139,11 +139,13 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::Execute()\n";
-    std::cout << "---------------------------------------------------------------------------------------\n";
-
     const auto& stream = context.getThreadContext().stream();
+
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "TensorIteratorOp::Execute()\n";
+    // std::cout << "stream: " << stream.get() << ", this: " << this << '\n';
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+
     const auto& memoryManager = *memory_manager_;
     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
     // auto& cancellationToken = context.getCancellationToken();
@@ -161,30 +163,36 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
         }
     }
 
-    slices_.clear();
-    slices_.reserve(portmap_inputs_.size());
+    std::vector<SliceLauncher> slices;
+    slices.clear();
+    slices.reserve(portmap_inputs_.size());
     // Input mapping of ports
     for (auto& it : portmap_inputs_) {
         const auto& inputIdx = it.first;
         const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-        slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        slices.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
     }
 
-    transfers_.clear();
-    transfers_.reserve(results_parameters_map_.size());
+    std::vector<TransferLauncher> transfers;
+    transfers.clear();
+    transfers.reserve(results_parameters_map_.size());
     // Back-edge mapping
     for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
         // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
-        transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+        // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+        transfers.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
     }
 
-    inserts_.clear();
-    inserts_.reserve(results_outputs_map_.size());
+    std::vector<InsertLauncher> inserts;
+    inserts.clear();
+    inserts.reserve(results_outputs_map_.size());
     // Output mapping of ports
     for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
         if (portmap_outputs_.count(outputIdx) > 0) {
             // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
-            inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            inserts.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
         }
     }
 
@@ -224,21 +232,24 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
 
         // // Input mapping of ports
-        for (const auto& slice : slices_) {
-            slice(iter);
+        for (const auto& slice : slices) {
+            // slice(iter);
+            slice(stream, iter);
         }
 
         // Inner loop
         executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
 
         // // Back-edge mapping
-        for (const auto& transfer : transfers_) {
-            transfer();
+        for (const auto& transfer : transfers) {
+            // transfer();
+            transfer(stream);
         }
 
         // // Output mapping of ports
-        for (const auto& insert : inserts_) {
-            insert(iter);
+        for (const auto& insert : inserts) {
+            // insert(iter);
+            insert(stream, iter);
         }
     }
 
@@ -336,7 +347,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     for (auto& it : portmap_inputs_) {
         const auto& inputIdx = it.first;
         const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-        slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        slices_.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
     }
 
     transfers_.clear();
@@ -344,7 +356,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     // Back-edge mapping
     for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
         // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
-        transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+        // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+        transfers_.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
     }
 
     inserts_.clear();
@@ -353,7 +366,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
         if (portmap_outputs_.count(outputIdx) > 0) {
             // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
-            inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            inserts_.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
         }
     }
 
@@ -364,7 +378,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
 
         // throwIfError(cudaStreamBeginCapture(stream.get(), cudaStreamCaptureModeThreadLocal));
         for (auto& slice : slices_) {
-            slice.capture();
+            // slice.capture();
+            slice.capture(stream);
         }
 
         // Inner loop
@@ -372,12 +387,14 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
 
         // // Back-edge mapping
         for (auto& transfer : transfers_) {
-            transfer.capture();
+            // transfer.capture();
+            transfer.capture(stream);
         }
 
         // // Output mapping of ports
         for (auto& insert : inserts_) {
-            insert.capture();
+            // insert.capture();
+            insert.capture(stream);
         }
         // throwIfError(cudaStreamEndCapture(stream.get(), &cudaGraph));
     }
@@ -389,12 +406,13 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
 }
 
 TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
-                                               const CUDA::Stream& stream,
+                                            //    const CUDA::Stream& stream,
                                                const CUDA::DevicePointer<void*> mutableBuffer,
                                                const IOperationExec::Inputs& inputTensors,
                                                const uint64_t inputIdx,
                                                const uint64_t paramIdx)
-    : stream_(stream),
+    // : stream_(stream),
+    :
       slice_{ti.kernelmap_inputs_.at(inputIdx)} {
     // std::cout << "---------------------------------------------------------------------------------------\n";
     // std::cout << "SliceLauncher::SliceLauncher()\n";
@@ -424,15 +442,59 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
     start_ = start;
     stride_ = portMap.stride;
 
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////// TODO: move launcher initialization to constructor and pointer hadling to operator() //////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
     // std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
-                                                     const CUDA::Stream& stream,
+                                                    //  const CUDA::Stream& stream,
                                                      CUDA::DevicePointer<void*> mutableBuffer,
                                                      uint64_t resultIdx,
                                                      uint64_t paramIdx)
-    : stream_(stream) {
+    // : stream_(stream) {
+    {
     // std::cout << "=======================================================================================\n";
     // std::cout << "TransferLauncher::TransferLauncher()\n";
 
@@ -454,12 +516,13 @@ TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
 }
 
 TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
-                                                 const CUDA::Stream& stream,
+                                                //  const CUDA::Stream& stream,
                                                  CUDA::DevicePointer<void*> mutableBuffer,
                                                  const IOperationExec::Outputs& outputTensors,
                                                  const std::size_t resultIdx,
                                                  const std::size_t outputIdx)
-    : stream_(stream),
+    // : stream_(stream),
+    :
       insert_{ti.kernelmap_outputs_.at(outputIdx)} {
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
     // std::cout << "InsertLauncher::InsertLauncher()\n";

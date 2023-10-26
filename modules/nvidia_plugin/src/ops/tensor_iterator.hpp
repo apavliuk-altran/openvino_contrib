@@ -52,18 +52,18 @@ private:
     class SliceLauncher {
     public:
         SliceLauncher(const TensorIteratorOp& ti,
-                      const CUDA::Stream& stream,
+                    //   const CUDA::Stream& stream,
                       const CUDA::DevicePointer<void*> mutableBuffer,
                       const IOperationExec::Inputs& inputTensors,
                       const uint64_t inputIdx,
                       const uint64_t paramIdx);
 
-        inline void operator()(int64_t iter) const {
-            slice_(stream_.get(), src_, dst_, start_ + iter * stride_);
+        inline void operator()(const CUDA::Stream& stream, int64_t iter) const {
+            slice_(stream.get(), src_, dst_, start_ + iter * stride_);
         }
 
-        void capture() {
-            slice_node_.emplace(CUDA::CaptureInfo{stream_}.addSliceNode(slice_.getParams(src_, dst_, start_)));
+        void capture(const CUDA::Stream& stream) {
+            slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src_, dst_, start_)));
         }
 
         inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
@@ -71,7 +71,7 @@ private:
         }
 
     private:
-        const CUDA::Stream& stream_;
+        // const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         size_t start_;
@@ -83,19 +83,19 @@ private:
     class TransferLauncher {
     public:
         TransferLauncher(const TensorIteratorOp& ti,
-                         const CUDA::Stream& stream,
+                        //  const CUDA::Stream& stream,
                          CUDA::DevicePointer<void*> mutableBuffer,
                          uint64_t resultIdx,
                          uint64_t paramIdx);
 
-        inline void operator()() const {
+        inline void operator()(const CUDA::Stream& stream) const {
             // stream_.transfer(dst_, src_, count_);
-            throwIfError(cudaMemcpyAsync(dst_, src_, count_, cudaMemcpyDeviceToDevice, stream_.get()));
+            throwIfError(cudaMemcpyAsync(dst_, src_, count_, cudaMemcpyDeviceToDevice, stream.get()));
         }
 
-        void capture() {
+        void capture(const CUDA::Stream& stream) {
             // TODO: refactor
-            transfer_node_.emplace(CUDA::CaptureInfo{stream_}.addTransferNode(
+            transfer_node_.emplace(CUDA::CaptureInfo{stream}.addTransferNode(
                 CUDA::DevicePointer<void *>{dst_},
                 CUDA::DevicePointer<const void *>{src_},
                 count_));
@@ -104,7 +104,7 @@ private:
     private:
         // CUDA::DevicePointer<void*> dst_;
         // CUDA::DevicePointer<const void*> src_;
-        const CUDA::Stream& stream_;
+        // const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         std::size_t count_;
@@ -114,18 +114,18 @@ private:
     class InsertLauncher {
     public:
         InsertLauncher(const TensorIteratorOp& ti,
-                       const CUDA::Stream& stream,
+                    //    const CUDA::Stream& stream,
                        CUDA::DevicePointer<void*> mutableBuffer,
                        const IOperationExec::Outputs& outputTensors,
                        const std::size_t resultIdx,
                        const std::size_t outputIdx);
 
-        inline void operator()(int64_t iter) const {
-            insert_(stream_.get(), src_, dst_, start_ + iter * stride_);
+        inline void operator()(const CUDA::Stream& stream, int64_t iter) const {
+            insert_(stream.get(), src_, dst_, start_ + iter * stride_);
         }
 
-        void capture() {
-            insert_node_.emplace(CUDA::CaptureInfo{stream_}.addInsertNode(insert_.getParams(src_, dst_, start_)));
+        void capture(const CUDA::Stream& stream) {
+            insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src_, dst_, start_)));
         }
 
         inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
@@ -133,7 +133,7 @@ private:
         }
 
     private:
-        const CUDA::Stream& stream_;
+        // const CUDA::Stream& stream_;
         const void* src_;
         void* dst_;
         size_t start_;
