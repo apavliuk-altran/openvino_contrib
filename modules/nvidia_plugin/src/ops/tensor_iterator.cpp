@@ -133,6 +133,43 @@ TensorIteratorOp::TensorIteratorOp(const CreationContext& context,
     }
 
     updateExecSequence();
+
+    // std::vector<SliceLauncher> slices;
+    // slices.clear();
+    slices_.reserve(portmap_inputs_.size());
+    // Input mapping of ports
+    for (auto& it : portmap_inputs_) {
+        const auto& inputIdx = it.first;
+        const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+        // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        // slices.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        slices_.emplace_back(*this, inputIdx, paramIdx);
+    }
+
+    // std::vector<TransferLauncher> transfers;
+    // transfers.clear();
+    transfers_.reserve(results_parameters_map_.size());
+    // Back-edge mapping
+    for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+        // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+        // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+        // transfers.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
+        transfers_.emplace_back(*this, resultIdx, paramIdx);
+    }
+
+    // std::vector<InsertLauncher> inserts;
+    // inserts.clear();
+    inserts_.reserve(results_outputs_map_.size());
+    // Output mapping of ports
+    for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+        if (portmap_outputs_.count(outputIdx) > 0) {
+            // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+            // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            // inserts.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            inserts_.emplace_back(*this, resultIdx, outputIdx);
+        }
+    }
+
 }
 
 void TensorIteratorOp::Execute(const InferenceRequestContext& context,
@@ -163,38 +200,41 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
         }
     }
 
-    std::vector<SliceLauncher> slices;
-    slices.clear();
-    slices.reserve(portmap_inputs_.size());
-    // Input mapping of ports
-    for (auto& it : portmap_inputs_) {
-        const auto& inputIdx = it.first;
-        const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-        // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
-        slices.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
-    }
+    // std::vector<SliceLauncher> slices;
+    // slices.clear();
+    // slices.reserve(portmap_inputs_.size());
+    // // Input mapping of ports
+    // for (auto& it : portmap_inputs_) {
+    //     const auto& inputIdx = it.first;
+    //     const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+    //     // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+    //     // slices.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
+    //     slices.emplace_back(*this, inputIdx, paramIdx);
+    // }
 
-    std::vector<TransferLauncher> transfers;
-    transfers.clear();
-    transfers.reserve(results_parameters_map_.size());
-    // Back-edge mapping
-    for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
-        // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
-        // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
-        transfers.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
-    }
+    // std::vector<TransferLauncher> transfers;
+    // transfers.clear();
+    // transfers.reserve(results_parameters_map_.size());
+    // // Back-edge mapping
+    // for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+    //     // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+    //     // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+    //     // transfers.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
+    //     transfers.emplace_back(*this, resultIdx, paramIdx);
+    // }
 
-    std::vector<InsertLauncher> inserts;
-    inserts.clear();
-    inserts.reserve(results_outputs_map_.size());
-    // Output mapping of ports
-    for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
-        if (portmap_outputs_.count(outputIdx) > 0) {
-            // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
-            // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
-            inserts.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
-        }
-    }
+    // std::vector<InsertLauncher> inserts;
+    // inserts.clear();
+    // inserts.reserve(results_outputs_map_.size());
+    // // Output mapping of ports
+    // for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+    //     if (portmap_outputs_.count(outputIdx) > 0) {
+    //         // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+    //         // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+    //         // inserts.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
+    //         inserts.emplace_back(*this, resultIdx, outputIdx);
+    //     }
+    // }
 
     // for (int64_t iter = 0; iter < num_iterations_; ++iter) {
 
@@ -232,24 +272,27 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
 
         // // Input mapping of ports
-        for (const auto& slice : slices) {
+        for (const auto& slice : slices_) {
             // slice(iter);
-            slice(stream, iter);
+            // slice(stream, iter);
+            slice(stream, inputTensors, mutableBuffer, iter);
         }
 
         // Inner loop
         executionDelegator.execute_sequence(this, memoryManager, mutableBuffer, context);
 
         // // Back-edge mapping
-        for (const auto& transfer : transfers) {
+        for (const auto& transfer : transfers_) {
             // transfer();
-            transfer(stream);
+            // transfer(stream);
+            transfer(stream, mutableBuffer);
         }
 
         // // Output mapping of ports
-        for (const auto& insert : inserts) {
+        for (const auto& insert : inserts_) {
             // insert(iter);
-            insert(stream, iter);
+            // insert(stream, iter);
+            insert(stream, mutableBuffer, outputTensors, iter);
         }
     }
 
@@ -348,7 +391,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         const auto& inputIdx = it.first;
         const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
         // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
-        slices_.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        // slices_.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
+        slices_.emplace_back(*this, inputIdx, paramIdx);
     }
 
     transfers_.clear();
@@ -357,7 +401,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
         // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
         // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
-        transfers_.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
+        // transfers_.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
+        transfers_.emplace_back(*this, resultIdx, paramIdx);
     }
 
     inserts_.clear();
@@ -367,7 +412,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         if (portmap_outputs_.count(outputIdx) > 0) {
             // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
             // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
-            inserts_.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            // inserts_.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
+            inserts_.emplace_back(*this, resultIdx, outputIdx);
         }
     }
 
@@ -407,152 +453,99 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
 
 TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,
                                             //    const CUDA::Stream& stream,
-                                               const CUDA::DevicePointer<void*> mutableBuffer,
-                                               const IOperationExec::Inputs& inputTensors,
-                                               const uint64_t inputIdx,
-                                               const uint64_t paramIdx)
+                                            //    const CUDA::DevicePointer<void*> mutableBuffer,
+                                            //    const IOperationExec::Inputs& inputTensors,
+                                               uint64_t inputIdx,
+                                               uint64_t paramIdx)
     // : stream_(stream),
-    :
+    : input_idx_{inputIdx},
+      param_{*ti.params_[paramIdx]},
+      memory_manager_{*ti.memory_manager_},
       slice_{ti.kernelmap_inputs_.at(inputIdx)} {
     // std::cout << "---------------------------------------------------------------------------------------\n";
     // std::cout << "SliceLauncher::SliceLauncher()\n";
 
     OPENVINO_ASSERT(ti.portmap_inputs_.count(inputIdx) != 0, "Node name: ", ti.GetName());
-    auto& memoryManager = *ti.memory_manager_;
-    const std::size_t inputSize = ti.inputs_info_[inputIdx].size_;
-    const std::size_t paramSize = ti.params_info_[paramIdx].size_;
+    // const std::size_t inputSize = ti.inputs_info_[inputIdx].size_;
+    // const std::size_t paramSize = ti.params_info_[paramIdx].size_;
 
-    const auto& portMap = ti.portmap_inputs_.at(inputIdx);
-    const auto& param = ti.params_[paramIdx];
-    auto outputTensors = memoryManager.outputTensorPointers(*param, mutableBuffer);
-    const auto inputShape = ti.inputs_info_[inputIdx].shape_;
+    // const auto& param = ti.params_[paramIdx];
 
     // const auto& slice = kernelmap_inputs_.at(inputIdx);
-    std::size_t start;
-    if (portMap.start < 0) {
-        start = inputShape[portMap.axis] + portMap.start;
-    } else {
-        start = portMap.start;
-    }
+    // std::size_t start;
     // start += iter * portMap.stride;
-    auto input = inputTensors[inputIdx];
-
-    src_ = input.get();
-    dst_ = outputTensors[0].get();
-    start_ = start;
+    const auto& portMap = ti.portmap_inputs_.at(input_idx_);
+    const auto& inputShape = ti.inputs_info_[input_idx_].shape_;
+    start_ = portMap.start < 0 ? inputShape[portMap.axis] + portMap.start  : portMap.start;
     stride_ = portMap.stride;
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////// TODO: move launcher initialization to constructor and pointer hadling to operator() //////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 
     // std::cout << "---------------------------------------------------------------------------------------\n";
 }
 
 TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
                                                     //  const CUDA::Stream& stream,
-                                                     CUDA::DevicePointer<void*> mutableBuffer,
+                                                    //  CUDA::DevicePointer<void*> mutableBuffer,
                                                      uint64_t resultIdx,
                                                      uint64_t paramIdx)
     // : stream_(stream) {
+        : param_{*ti.params_[paramIdx]},
+          result_{*ti.results_[resultIdx]},
+          memory_manager_{*ti.memory_manager_}
     {
     // std::cout << "=======================================================================================\n";
     // std::cout << "TransferLauncher::TransferLauncher()\n";
 
-    auto& memoryManager = *ti.memory_manager_;
-    const auto& result = ti.results_[resultIdx];
-    const auto& param = ti.params_[paramIdx];
-    auto paramTensors = memoryManager.outputTensorPointers(*param, mutableBuffer);
-    auto resultTensors = memoryManager.inputTensorPointers(*result, mutableBuffer);
-    const std::size_t paramSize = ti.params_info_[paramIdx].size_;
-    const std::size_t resultSize = ti.results_info_[resultIdx].size_;
-    OPENVINO_ASSERT(paramSize == resultSize, "Node name: ", ti.GetName());
+    // auto& memoryManager = *ti.memory_manager_;
+    // const auto& result = ti.results_[resultIdx];
+    // const auto& param = ti.params_[paramIdx];
+    // const std::size_t paramSize = ti.params_info_[paramIdx].size_;
+    // OPENVINO_ASSERT(paramSize == resultSize, "Node name: ", ti.GetName());
+    param_size_ = ti.params_info_[paramIdx].size_;
+    const auto resultSize = ti.results_info_[resultIdx].size_;
+    OPENVINO_ASSERT(param_size_ == resultSize, "Node name: ", ti.GetName());
+    // count_ = paramSize;
 
     // stream.transfer(paramTensors[0], resultTensors[0], paramSize);
-    dst_ = paramTensors[0].get();
-    src_ = resultTensors[0].get();
-    count_ = paramSize;
 
     // std::cout << "=======================================================================================\n";
 }
 
 TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
                                                 //  const CUDA::Stream& stream,
-                                                 CUDA::DevicePointer<void*> mutableBuffer,
-                                                 const IOperationExec::Outputs& outputTensors,
+                                                //  CUDA::DevicePointer<void*> mutableBuffer,
+                                                //  const IOperationExec::Outputs& outputTensors,
                                                  const std::size_t resultIdx,
                                                  const std::size_t outputIdx)
     // : stream_(stream),
-    :
+    : output_idx_{outputIdx},
+      result_{*ti.results_[resultIdx]},
+      memory_manager_{*ti.memory_manager_},
       insert_{ti.kernelmap_outputs_.at(outputIdx)} {
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
     // std::cout << "InsertLauncher::InsertLauncher()\n";
 
     OPENVINO_ASSERT(ti.portmap_outputs_.count(outputIdx) != 0, "Node name: ", ti.GetName());
-    auto& memoryManager = *ti.memory_manager_;
-    const auto resultSize = ti.results_info_[resultIdx].size_;
-    const std::size_t outputSize = ti.outputs_info_[outputIdx].size_;
+    // auto& memoryManager = *ti.memory_manager_;
+    // const auto resultSize = ti.results_info_[resultIdx].size_;
+    // const std::size_t outputSize = ti.outputs_info_[outputIdx].size_;
 
-    auto output = outputTensors[outputIdx];
-    const auto& result = ti.results_[resultIdx];
-    auto inputTensors = memoryManager.inputTensorPointers(*result, mutableBuffer);
-    const auto portMap = ti.portmap_outputs_.at(outputIdx);
-    const auto outputShape = ti.outputs_info_[outputIdx].shape_;
+    // const auto& result = ti.results_[resultIdx];
+    const auto& portMap = ti.portmap_outputs_.at(output_idx_);
+    const auto& outputShape = ti.outputs_info_[output_idx_].shape_;
 
     // const auto& insert = ti.kernelmap_outputs_.at(outputIdx);
-    std::size_t start;
-    if (portMap.start < 0) {
-        start = outputShape[portMap.axis] + portMap.start;
-    } else {
-        start = portMap.start;
-    }
+    // std::size_t start;
+    // if (portMap.start < 0) {
+    //     start = outputShape[portMap.axis] + portMap.start;
+    // } else {
+    //     start = portMap.start;
+    // }
     // start += iter * portMap.stride;
+    // start_ = start;
+    start_ = portMap.start < 0 ? outputShape[portMap.axis] + portMap.start : portMap.start;
+    stride_ = portMap.stride;
 
     // insert(stream.get(), inputTensors[0].get(), output.get(), start);
-
-    src_ = inputTensors[0].get();
-    dst_ = output.get();
-    start_ = start;
-    stride_ = portMap.stride;
 
     // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
