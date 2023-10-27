@@ -16,6 +16,7 @@ public:
     void reset();
 
     void start_next_graph_addition();
+    void start_ti_graph_addition();
 
     void add_parameter(const std::string& tensorName,
                        const CUDA::Stream& stream,
@@ -29,13 +30,26 @@ public:
                     CUDA::DevicePointer<const void*> src,
                     std::size_t size);
 
+    void add_transfer(const CUDA::Stream& stream,
+                      CUDA::DevicePointer<void*> dst,
+                      CUDA::DevicePointer<const void*> src,
+                      std::size_t size);
+
+    void add_slice(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+
+    void add_insert(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+
     void add_graph(const CUDA::Graph& graph);
+    void add_ti_graph(const CUDA::Graph& graph);
 
     bool is_initialized() const;
 
     void update_capture(const TensorMappingContext& context);
+    void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+    void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
 
     void launch(std::size_t index, const CUDA::Stream& stream) const;
+    void launch_ti_graph(const CUDA::Stream& stream) const;
 
     std::size_t get_params_count() const;
     std::size_t get_results_count() const;
@@ -47,6 +61,11 @@ public:
 private:
     class CudaGraphInfo {
     public:
+        // // TODO: think about this
+        // CudaGraphInfo() = default;
+        // CudaGraphInfo(const CudaGraphInfo&) = default;
+        // CudaGraphInfo(CudaGraphInfo&&) = default;
+
         void add_parameter(const std::string& tensorName,
                            const CUDA::Stream& stream,
                            CUDA::DevicePointer<void*> dst,
@@ -59,11 +78,21 @@ private:
                         CUDA::DevicePointer<const void*> src,
                         std::size_t size);
 
+        void add_transfer(const CUDA::Stream& stream,
+                          CUDA::DevicePointer<void*> dst,
+                          CUDA::DevicePointer<const void*> src,
+                          std::size_t size);
+
+        void add_slice(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+        void add_insert(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+
         void set_graph(const CUDA::Graph& graph);
 
         bool is_initialized() const;
 
         void update_capture(const TensorMappingContext& context);
+        void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+        void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
 
         void launch(const CUDA::Stream& stream) const;
 
@@ -78,12 +107,18 @@ private:
         std::optional<CUDA::GraphExec> graphExec_{};
         std::map<std::string, CUDA::UploadNode> parameterNodes_;
         std::map<std::string, CUDA::DownloadNode> resultNodes_;
+
+        std::vector<CUDA::TransferNode> transferNodes_;
+        std::vector<CUDA::SliceNode> sliceNodes_;
+        std::vector<CUDA::InsertNode> insertNodes_;
     };
 
     friend bool operator==(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
     friend bool operator!=(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
 
+private:
     std::vector<CudaGraphInfo> graphs_{};
+    CudaGraphInfo ti_graph_info_;
     mutable std::size_t currentGraphIndex_ = 0;
 };
 

@@ -17,6 +17,12 @@ void CudaGraphContext::start_next_graph_addition() {
     graphs_.emplace_back();
 }
 
+void CudaGraphContext::start_ti_graph_addition() {
+    // OPENVINO_ASSERT(!ti_graph_info_.is_initialized(), "Only one TI graph supported");
+    // ti_graph_info_.emplace();
+    ti_graph_info_ = {};
+}
+
 void CudaGraphContext::add_parameter(const std::string& tensorName,
                                      const CUDA::Stream& stream,
                                      CUDA::DevicePointer<void*> dst,
@@ -35,9 +41,34 @@ void CudaGraphContext::add_result(const std::string& tensorName,
     graphs_[currentGraphIndex_].add_result(tensorName, stream, dst, src, size);
 }
 
+void CudaGraphContext::add_transfer(const CUDA::Stream& stream,
+                                    CUDA::DevicePointer<void*> dst,
+                                    CUDA::DevicePointer<const void*> src,
+                                    std::size_t size) {
+    // OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.add_transfer(stream, dst, src, size);
+}
+
+void CudaGraphContext::add_slice(const CUDA::Stream& stream,
+                                 std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    // OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.add_slice(stream, std::move(sliceParams));
+}
+
+void CudaGraphContext::add_insert(const CUDA::Stream& stream,
+                                  std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+    // OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.add_insert(stream, std::move(insertParams));
+}
+
 void CudaGraphContext::add_graph(const CUDA::Graph& graph) {
     OPENVINO_ASSERT(currentGraphIndex_ < graphs_.size(), "Graph index/vector size incosistency");
     graphs_[currentGraphIndex_].set_graph(graph);
+}
+
+void CudaGraphContext::add_ti_graph(const CUDA::Graph& graph) {
+    // OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.set_graph(graph);
 }
 
 bool CudaGraphContext::is_initialized() const {
@@ -51,10 +82,27 @@ void CudaGraphContext::update_capture(const TensorMappingContext& context) {
     }
 }
 
+void CudaGraphContext::update_slice(std::size_t index,
+                                    std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.update_slice(index, std::move(sliceParams));
+}
+
+void CudaGraphContext::update_insert(std::size_t index,
+                                     std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+    OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.update_insert(index, std::move(insertParams));
+}
+
 void CudaGraphContext::launch(std::size_t index, const CUDA::Stream& stream) const {
     currentGraphIndex_ = index;
     OPENVINO_ASSERT(currentGraphIndex_ < graphs_.size(), "Graph index/vector size incosistency");
     graphs_[currentGraphIndex_].launch(stream);
+}
+
+void CudaGraphContext::launch_ti_graph(const CUDA::Stream& stream) const {
+    OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
+    ti_graph_info_.launch(stream);
 }
 
 std::size_t CudaGraphContext::get_params_count() const {
@@ -93,6 +141,26 @@ void CudaGraphContext::CudaGraphInfo::add_result(const std::string& tensorName,
     resultNodes_.emplace(tensorName, captureInfo.addDownloadNode(dst, src, size));
 }
 
+void CudaGraphContext::CudaGraphInfo::add_transfer(const CUDA::Stream& stream,
+                                                   CUDA::DevicePointer<void*> dst,
+                                                   CUDA::DevicePointer<const void*> src,
+                                                   std::size_t size) {
+    CUDA::CaptureInfo captureInfo{stream};
+    transferNodes_.emplace_back(captureInfo.addTransferNode(dst, src, size));
+}
+
+void CudaGraphContext::CudaGraphInfo::add_slice(const CUDA::Stream& stream,
+                                                std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    CUDA::CaptureInfo captureInfo{stream};
+    sliceNodes_.emplace_back(captureInfo.addSliceNode(std::move(sliceParams)));
+}
+
+void CudaGraphContext::CudaGraphInfo::add_insert(const CUDA::Stream& stream,
+                                                 std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+    CUDA::CaptureInfo captureInfo{stream};
+    insertNodes_.emplace_back(captureInfo.addInsertNode(std::move(insertParams)));
+}
+
 void CudaGraphContext::CudaGraphInfo::set_graph(const CUDA::Graph& graph) {
     graph_.emplace(graph);
     graphExec_.emplace(graph);
@@ -107,6 +175,16 @@ void CudaGraphContext::CudaGraphInfo::update_capture(const TensorMappingContext&
     for (auto&& [tensorName, node] : resultNodes_) {
         node.update_dst(graphExec_.value(), context.get_output_tensor(tensorName)->data());
     }
+}
+
+void CudaGraphContext::CudaGraphInfo::update_slice(std::size_t index,
+                                                   std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+    sliceNodes_[index].update_params(graphExec_.value(), std::move(sliceParams));
+}
+
+void CudaGraphContext::CudaGraphInfo::update_insert(
+    std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+    insertNodes_[index].update_params(graphExec_.value(), std::move(insertParams));
 }
 
 void CudaGraphContext::CudaGraphInfo::launch(const CUDA::Stream& stream) const { graphExec_.value().launch(stream); }

@@ -305,7 +305,7 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     }
 }
 
-void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
+void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
                                     Inputs inputTensors,
                                     Outputs outputTensors,
                                     const Workbuffers& workbuffers) {
@@ -315,9 +315,9 @@ void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
     //     context.getCudaGraphContext().launch(graphIndex, stream);
     // }
 
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::ExecuteGraph()\n";
-    std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "TensorIteratorOp::ExecuteGraph()\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
 
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
@@ -339,16 +339,23 @@ void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
         }
     }
 
+    auto& graphContext = context.getCudaGraphContext();
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
-        for (auto& slice : slices_) {
-            // slice.update_capture(*graph_exec_, iter);
-            slice.update_capture(*graph_exec_, inputTensors, mutableBuffer, iter);
+        // for (auto& slice : slices_) {
+        //     slice.update_capture(*graph_exec_, iter);
+        // }
+        // for (auto& insert : inserts_) {
+        //     insert.update_capture(*graph_exec_, iter);
+        // }
+        // graph_exec_->launch(tream);
+
+        for (std::size_t i = 0; i < slices_.size(); ++i) {
+            graphContext.update_slice(i, slices_[i].get_params(stream, mutableBuffer, inputTensors, iter));
         }
-        for (auto& insert : inserts_) {
-            // insert.update_capture(*graph_exec_, iter);
-            insert.update_capture(*graph_exec_, mutableBuffer, outputTensors, iter);
+        for (std::size_t i = 0; i < inserts_.size(); ++i) {
+            graphContext.update_insert(i, inserts_[i].get_params(stream, mutableBuffer, outputTensors, iter));
         }
-        graph_exec_->launch(stream);
+        graphContext.launch_ti_graph(stream);
     }
 
     // TODO: Hadle n-th iteration situation
@@ -374,9 +381,9 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
-    std::cout << "---------------------------------------------------------------------------------------\n";
-    std::cout << "TensorIteratorOp::Capture()\n";
-    std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
+    // std::cout << "TensorIteratorOp::Capture()\n";
+    // std::cout << "---------------------------------------------------------------------------------------\n";
 
     // Execute(context, inputTensors, outputTensors, workbuffers);
     const auto& stream = context.getThreadContext().stream();
@@ -419,6 +426,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     //     }
     // }
 
+    auto& graphContext = context.getCudaGraphContext();
+    graphContext.start_ti_graph_addition();
     CUDA::GraphCapture capture{stream};
     // cudaGraph_t cudaGraph{};
     {
@@ -428,7 +437,7 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         for (auto& slice : slices_) {
             // slice.capture();
             // slice.capture(stream);
-            slice.capture(stream, inputTensors, mutableBuffer);
+            graphContext.add_slice(stream, slice.get_params(stream, mutableBuffer, inputTensors, 0));
         }
 
         // Inner loop
@@ -438,22 +447,26 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         for (auto& transfer : transfers_) {
             // transfer.capture();
             // transfer.capture(stream);
-            transfer.capture(stream, mutableBuffer);
+            graphContext.add_transfer(stream,
+                                      CUDA::DevicePointer<void*>{transfer.get_dst(mutableBuffer)},
+                                      CUDA::DevicePointer<const void*>{transfer.get_src(mutableBuffer)},
+                                      transfer.get_param_size());
         }
 
         // // Output mapping of ports
         for (auto& insert : inserts_) {
             // insert.capture();
             // insert.capture(stream);
-            insert.capture(stream, mutableBuffer, outputTensors);
+            graphContext.add_insert(stream, insert.get_params(stream, mutableBuffer, outputTensors, 0));
         }
         // throwIfError(cudaStreamEndCapture(stream.get(), &cudaGraph));
     }
     const auto& graph = capture.getGraph();
-    graph_.emplace(graph);
-    graph_exec_.emplace(graph);
+    // graph_.emplace(graph);
+    // graph_exec_.emplace(graph);
     // graph_.emplace(cudaGraph);
     // graph_exec_.emplace(cudaGraph);
+    graphContext.add_ti_graph(graph);
 }
 
 TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti,

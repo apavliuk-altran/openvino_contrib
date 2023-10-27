@@ -75,7 +75,8 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
             const auto& inputTensors = memoryManager.inputTensorPointers(*ti, mutableBuffer);
             const auto& outputTensors = memoryManager.outputTensorPointers(*ti, mutableBuffer);
             const auto& workBuffers = memoryManager.workBuffers(*ti, mutableBuffer);
-            ti->ExecuteGraph(context, inputTensors, outputTensors, workBuffers);
+            // TODO: avoid const_cast
+            ti->ExecuteGraph(const_cast<InferenceRequestContext&>(context), inputTensors, outputTensors, workBuffers);
         } else if (subgraph.IsCudaGraphCompatible()) {
             context.getCudaGraphContext().launch(graphIndex, stream);
             graphIndex++;

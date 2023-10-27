@@ -28,7 +28,7 @@ public:
                  Outputs outputTensors,
                  const Workbuffers& workbuffers) const override;
 
-    void ExecuteGraph(const InferenceRequestContext& context,
+    void ExecuteGraph(InferenceRequestContext& context,
                       Inputs inputTensors,
                       Outputs outputTensors,
                       const Workbuffers& workbuffers);
@@ -73,26 +73,19 @@ private:
             slice_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void capture(const CUDA::Stream& stream,
-                     const IOperationExec::Inputs& inputTensors,
-                     CUDA::DevicePointer<void*> mutableBuffer) {
+        inline std::unique_ptr<kernel::Slice::Params> get_params(const CUDA::Stream& stream,
+                                                                 CUDA::DevicePointer<void*> mutableBuffer,
+                                                                 const IOperationExec::Inputs& inputTensors,
+                                                                 int64_t iter) {
             // slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src_, dst_, start_)));
             const auto* src = inputTensors[input_idx_].get();
             auto* dst = memory_manager_.outputTensorPointers(param_, mutableBuffer)[0].get();
-
-            slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src, dst, start_)));
+            return slice_.getParams(src, dst, start_ + iter * stride_);
         }
 
-        inline void update_capture(const CUDA::GraphExec& exec,
-                                   const IOperationExec::Inputs& inputTensors,
-                                   CUDA::DevicePointer<void*> mutableBuffer,
-                                   int64_t iter) {
+        // inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
             // slice_node_->update_params(exec, slice_.getParams(src_, dst_, start_ + iter * stride_));
-            const auto* src = inputTensors[input_idx_].get();
-            auto* dst = memory_manager_.outputTensorPointers(param_, mutableBuffer)[0].get();
-
-            slice_node_->update_params(exec, slice_.getParams(src, dst, start_ + iter * stride_));
-        }
+        // }
 
     private:
         // const CUDA::Stream& stream_;
@@ -104,7 +97,7 @@ private:
         const kernel::Slice& slice_;
         size_t start_;
         int64_t stride_;
-        std::optional<CUDA::SliceNode> slice_node_;
+        // std::optional<CUDA::SliceNode> slice_node_;
     };
 
     class TransferLauncher {
@@ -125,22 +118,25 @@ private:
             throwIfError(cudaMemcpyAsync(dst, src, param_size_, cudaMemcpyDeviceToDevice, stream.get()));
         }
 
-        void capture(const CUDA::Stream& stream, CUDA::DevicePointer<void*> mutableBuffer) {
+        // inline void capture(const CUDA::Stream& stream) {
             // // TODO: refactor
             // transfer_node_.emplace(CUDA::CaptureInfo{stream}.addTransferNode(
             //     CUDA::DevicePointer<void *>{dst_},
             //     CUDA::DevicePointer<const void *>{src_},
             //     count_));
-
+        // }
+        inline void* get_dst(CUDA::DevicePointer<void*> mutableBuffer) const {
             const auto& paramTensors = memory_manager_.outputTensorPointers(param_, mutableBuffer);
-            const auto& resultTensors = memory_manager_.inputTensorPointers(result_, mutableBuffer);
-            auto* dst = paramTensors[0].get();
-            const auto* src = resultTensors[0].get();
+            return paramTensors[0].get();
+        }
 
-            transfer_node_.emplace(CUDA::CaptureInfo{stream}.addTransferNode(
-                CUDA::DevicePointer<void *>{dst},
-                CUDA::DevicePointer<const void *>{src},
-                param_size_));
+        inline const void* get_src(CUDA::DevicePointer<void*> mutableBuffer) const {
+            const auto& resultTensors = memory_manager_.inputTensorPointers(result_, mutableBuffer);
+            return resultTensors[0].get();
+        }
+
+        inline std::size_t get_param_size() const {
+            return param_size_;
         }
 
     private:
@@ -153,7 +149,7 @@ private:
         const OperationBase& result_;
         const MemoryManager& memory_manager_;
         std::size_t param_size_;
-        std::optional<CUDA::TransferNode> transfer_node_;
+        // std::optional<CUDA::TransferNode> transfer_node_;
     };
 
     class InsertLauncher {
@@ -177,26 +173,20 @@ private:
             insert_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void capture(const CUDA::Stream& stream,
-                     CUDA::DevicePointer<void*> mutableBuffer,
-                     const IOperationExec::Outputs& outputTensors) {
+        inline std::unique_ptr<kernel::Insert::Params> get_params(const CUDA::Stream& stream,
+                                                                  CUDA::DevicePointer<void*> mutableBuffer,
+                                                                  const IOperationExec::Outputs& outputTensors,
+                                                                  int64_t iter) {
             // insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src_, dst_, start_)));
             const auto* src = memory_manager_.inputTensorPointers(result_, mutableBuffer)[0].get();
             auto* dst = outputTensors[output_idx_].get();
 
-            insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src, dst, start_)));
+            return insert_.getParams(src, dst, start_ + iter * stride_);
         }
 
-        inline void update_capture(const CUDA::GraphExec& exec,
-                                   CUDA::DevicePointer<void*> mutableBuffer,
-                                   const IOperationExec::Outputs& outputTensors,
-                                   int64_t iter) {
+        // inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
             // insert_node_->update_params(exec, insert_.getParams(src_, dst_, start_ + iter * stride_));
-            const auto* src = memory_manager_.inputTensorPointers(result_, mutableBuffer)[0].get();
-            auto* dst = outputTensors[output_idx_].get();
-
-            insert_node_->update_params(exec, insert_.getParams(src, dst, start_ + iter * stride_));
-        }
+        // }
 
     private:
         // const CUDA::Stream& stream_;
@@ -208,7 +198,7 @@ private:
         size_t start_;
         int64_t stride_;
         const kernel::Insert& insert_;
-        std::optional<CUDA::InsertNode> insert_node_;
+        // std::optional<CUDA::InsertNode> insert_node_;
     };
 
     WorkbufferRequest GetWorkBufferRequest() const override;
@@ -259,8 +249,8 @@ private:
     std::unordered_map<uint64_t, kernel::Insert> kernelmap_outputs_;
     std::unordered_map<uint64_t, uint64_t> results_parameters_map_;
 
-    mutable std::optional<CUDA::Graph> graph_;
-    mutable std::optional<CUDA::GraphExec> graph_exec_;
+    // mutable std::optional<CUDA::Graph> graph_;
+    // mutable std::optional<CUDA::GraphExec> graph_exec_;
     mutable std::vector<SliceLauncher> slices_;
     mutable std::vector<TransferLauncher> transfers_;
     mutable std::vector<InsertLauncher> inserts_;
