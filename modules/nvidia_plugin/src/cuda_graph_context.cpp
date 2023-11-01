@@ -21,6 +21,10 @@ void CudaGraphContext::start_ti_graph_addition() {
     // OPENVINO_ASSERT(!ti_graph_info_.is_initialized(), "Only one TI graph supported");
     // ti_graph_info_.emplace();
     ti_graph_info_ = {};
+    OPENVINO_ASSERT(ti_graph_info_.get_transfers_count() == 0 &&
+                    ti_graph_info_.get_slices_count() == 0 &&
+                    ti_graph_info_.get_inserts_count() == 0,
+                    "ti_graph_info_ hasn't been reset properly");
 }
 
 void CudaGraphContext::add_parameter(const std::string& tensorName,
@@ -83,13 +87,13 @@ void CudaGraphContext::update_capture(const TensorMappingContext& context) {
 }
 
 void CudaGraphContext::update_slice(std::size_t index,
-                                    std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
+                                    std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) const {
     OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
     ti_graph_info_.update_slice(index, std::move(sliceParams));
 }
 
 void CudaGraphContext::update_insert(std::size_t index,
-                                     std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
+                                     std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) const {
     OPENVINO_ASSERT(ti_graph_info_.is_initialized(), "TI graph not initialized");
     ti_graph_info_.update_insert(index, std::move(insertParams));
 }
@@ -120,6 +124,12 @@ std::size_t CudaGraphContext::get_results_count() const {
     }
     return res;
 }
+
+std::size_t CudaGraphContext::get_transfers_count() const { return ti_graph_info_.get_transfers_count(); }
+
+std::size_t CudaGraphContext::get_slices_count() const { return ti_graph_info_.get_slices_count(); }
+
+std::size_t CudaGraphContext::get_inserts_count() const { return ti_graph_info_.get_inserts_count(); }
 
 std::size_t CudaGraphContext::get_graphs_count() const { return graphs_.size(); }
 
@@ -192,6 +202,12 @@ void CudaGraphContext::CudaGraphInfo::launch(const CUDA::Stream& stream) const {
 std::size_t CudaGraphContext::CudaGraphInfo::get_params_count() const { return parameterNodes_.size(); }
 
 std::size_t CudaGraphContext::CudaGraphInfo::get_results_count() const { return resultNodes_.size(); }
+
+std::size_t CudaGraphContext::CudaGraphInfo::get_transfers_count() const { return transferNodes_.size(); }
+
+std::size_t CudaGraphContext::CudaGraphInfo::get_slices_count() const { return sliceNodes_.size(); }
+
+std::size_t CudaGraphContext::CudaGraphInfo::get_inserts_count() const { return insertNodes_.size(); }
 
 bool operator==(const CudaGraphContext::CudaGraphInfo& lhs, const CudaGraphContext::CudaGraphInfo& rhs) {
     return lhs.graph_ == rhs.graph_ && lhs.graphExec_ == rhs.graphExec_ && lhs.parameterNodes_ == rhs.parameterNodes_ &&

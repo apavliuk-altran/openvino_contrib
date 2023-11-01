@@ -135,9 +135,9 @@ class InsertNode {
     friend CaptureInfo;
 
 public:
-    InsertNode() = default;
-    InsertNode(const InsertNode&) = default;
-    InsertNode(InsertNode&&) = default;
+    // InsertNode() = default;
+    // InsertNode(const InsertNode&) = default;
+    // InsertNode(InsertNode&&) = default;
     void update_params(const GraphExec& exec, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
     // bool operator==(const InsertNode& rhs) const;
 
@@ -153,9 +153,9 @@ class SliceNode {
     friend CaptureInfo;
 
 public:
-    SliceNode() = default;
-    SliceNode(const SliceNode&) = default;
-    SliceNode(SliceNode&&) = default;
+    // SliceNode() = default;
+    // SliceNode(const SliceNode&) = default;
+    // SliceNode(SliceNode&&) = default;
     void update_params(const GraphExec& exec, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
     // bool operator==(const InsertNode& rhs) const;
 

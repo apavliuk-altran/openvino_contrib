@@ -28,7 +28,8 @@ public:
                  Outputs outputTensors,
                  const Workbuffers& workbuffers) const override;
 
-    void ExecuteGraph(InferenceRequestContext& context,
+    // void ExecuteGraph(InferenceRequestContext& context,
+    void ExecuteGraph(const InferenceRequestContext& context,
                       Inputs inputTensors,
                       Outputs outputTensors,
                       const Workbuffers& workbuffers);

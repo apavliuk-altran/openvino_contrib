@@ -45,14 +45,19 @@ public:
     bool is_initialized() const;
 
     void update_capture(const TensorMappingContext& context);
-    void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
-    void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+    void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) const;
+    void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) const;
 
     void launch(std::size_t index, const CUDA::Stream& stream) const;
     void launch_ti_graph(const CUDA::Stream& stream) const;
 
     std::size_t get_params_count() const;
     std::size_t get_results_count() const;
+    
+    std::size_t get_transfers_count() const;
+    std::size_t get_slices_count() const;
+    std::size_t get_inserts_count() const;
+
     std::size_t get_graphs_count() const;
 
     friend bool operator==(const CudaGraphContext& lhs, const CudaGraphContext& rhs);
@@ -99,6 +104,10 @@ private:
         std::size_t get_params_count() const;
         std::size_t get_results_count() const;
 
+        std::size_t get_transfers_count() const;
+        std::size_t get_slices_count() const;
+        std::size_t get_inserts_count() const;
+
         friend bool operator==(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
         friend bool operator!=(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
 
@@ -118,7 +127,7 @@ private:
 
 private:
     std::vector<CudaGraphInfo> graphs_{};
-    CudaGraphInfo ti_graph_info_;
+    mutable CudaGraphInfo ti_graph_info_;
     mutable std::size_t currentGraphIndex_ = 0;
 };
 

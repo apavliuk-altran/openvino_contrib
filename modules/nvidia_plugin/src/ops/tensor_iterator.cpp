@@ -305,7 +305,8 @@ void TensorIteratorOp::Execute(const InferenceRequestContext& context,
     }
 }
 
-void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
+// void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
+void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
                                     Inputs inputTensors,
                                     Outputs outputTensors,
                                     const Workbuffers& workbuffers) {
@@ -340,6 +341,10 @@ void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
     }
 
     auto& graphContext = context.getCudaGraphContext();
+    OPENVINO_ASSERT(graphContext.get_slices_count() == slices_.size() &&
+                    graphContext.get_inserts_count() == inserts_.size(),
+                    "CudaGraphContext/TensorIteratorOp slices or inserts count incosistency");
+
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
         // for (auto& slice : slices_) {
         //     slice.update_capture(*graph_exec_, iter);
