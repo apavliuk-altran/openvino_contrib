@@ -341,10 +341,12 @@ void TensorIteratorOp::ExecuteGraph(const InferenceRequestContext& context,
 
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
         for (auto& slice : slices_) {
-            slice.update_capture(*graph_exec_, iter);
+            // slice.update_capture(*graph_exec_, iter);
+            slice.update_capture(*graph_exec_, inputTensors, mutableBuffer, iter);
         }
         for (auto& insert : inserts_) {
-            insert.update_capture(*graph_exec_, iter);
+            // insert.update_capture(*graph_exec_, iter);
+            insert.update_capture(*graph_exec_, mutableBuffer, outputTensors, iter);
         }
         graph_exec_->launch(stream);
     }
@@ -384,38 +386,38 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     auto& executionDelegator = context.getExecutionDelegator();
     executionDelegator.set_stream(stream);
 
-    slices_.clear();
-    slices_.reserve(portmap_inputs_.size());
-    // Input mapping of ports
-    for (auto& it : portmap_inputs_) {
-        const auto& inputIdx = it.first;
-        const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
-        // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
-        // slices_.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
-        slices_.emplace_back(*this, inputIdx, paramIdx);
-    }
+    // slices_.clear();
+    // slices_.reserve(portmap_inputs_.size());
+    // // Input mapping of ports
+    // for (auto& it : portmap_inputs_) {
+    //     const auto& inputIdx = it.first;
+    //     const auto& paramIdx = inputs_parameters_map_.at(inputIdx);
+    //     // slices_.emplace_back(*this, stream, mutableBuffer, inputTensors, inputIdx, paramIdx);
+    //     // slices_.emplace_back(*this, mutableBuffer, inputTensors, inputIdx, paramIdx);
+    //     slices_.emplace_back(*this, inputIdx, paramIdx);
+    // }
 
-    transfers_.clear();
-    transfers_.reserve(results_parameters_map_.size());
-    // Back-edge mapping
-    for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
-        // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
-        // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
-        // transfers_.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
-        transfers_.emplace_back(*this, resultIdx, paramIdx);
-    }
+    // transfers_.clear();
+    // transfers_.reserve(results_parameters_map_.size());
+    // // Back-edge mapping
+    // for (auto& [resultIdx, paramIdx] : results_parameters_map_) {
+    //     // copyBackEdge(stream, mutableBuffer, resultIdx, paramIdx);
+    //     // transfers_.emplace_back(*this, stream, mutableBuffer, resultIdx, paramIdx);
+    //     // transfers_.emplace_back(*this, mutableBuffer, resultIdx, paramIdx);
+    //     transfers_.emplace_back(*this, resultIdx, paramIdx);
+    // }
 
-    inserts_.clear();
-    inserts_.reserve(results_outputs_map_.size());
-    // Output mapping of ports
-    for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
-        if (portmap_outputs_.count(outputIdx) > 0) {
-            // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
-            // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
-            // inserts_.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
-            inserts_.emplace_back(*this, resultIdx, outputIdx);
-        }
-    }
+    // inserts_.clear();
+    // inserts_.reserve(results_outputs_map_.size());
+    // // Output mapping of ports
+    // for (const auto& [resultIdx, outputIdx] : results_outputs_map_) {
+    //     if (portmap_outputs_.count(outputIdx) > 0) {
+    //         // insertResult(stream, mutableBuffer, outputTensors, iter, resultIdx, outputIdx);
+    //         // inserts_.emplace_back(*this, stream, mutableBuffer, outputTensors, resultIdx, outputIdx);
+    //         // inserts_.emplace_back(*this, mutableBuffer, outputTensors, resultIdx, outputIdx);
+    //         inserts_.emplace_back(*this, resultIdx, outputIdx);
+    //     }
+    // }
 
     CUDA::GraphCapture capture{stream};
     // cudaGraph_t cudaGraph{};
@@ -425,7 +427,8 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         // throwIfError(cudaStreamBeginCapture(stream.get(), cudaStreamCaptureModeThreadLocal));
         for (auto& slice : slices_) {
             // slice.capture();
-            slice.capture(stream);
+            // slice.capture(stream);
+            slice.capture(stream, inputTensors, mutableBuffer);
         }
 
         // Inner loop
@@ -434,13 +437,15 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
         // // Back-edge mapping
         for (auto& transfer : transfers_) {
             // transfer.capture();
-            transfer.capture(stream);
+            // transfer.capture(stream);
+            transfer.capture(stream, mutableBuffer);
         }
 
         // // Output mapping of ports
         for (auto& insert : inserts_) {
             // insert.capture();
-            insert.capture(stream);
+            // insert.capture(stream);
+            insert.capture(stream, mutableBuffer, outputTensors);
         }
         // throwIfError(cudaStreamEndCapture(stream.get(), &cudaGraph));
     }

@@ -73,12 +73,25 @@ private:
             slice_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void capture(const CUDA::Stream& stream) {
+        void capture(const CUDA::Stream& stream,
+                     const IOperationExec::Inputs& inputTensors,
+                     CUDA::DevicePointer<void*> mutableBuffer) {
             // slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src_, dst_, start_)));
+            const auto* src = inputTensors[input_idx_].get();
+            auto* dst = memory_manager_.outputTensorPointers(param_, mutableBuffer)[0].get();
+
+            slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src, dst, start_)));
         }
 
-        inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
+        inline void update_capture(const CUDA::GraphExec& exec,
+                                   const IOperationExec::Inputs& inputTensors,
+                                   CUDA::DevicePointer<void*> mutableBuffer,
+                                   int64_t iter) {
             // slice_node_->update_params(exec, slice_.getParams(src_, dst_, start_ + iter * stride_));
+            const auto* src = inputTensors[input_idx_].get();
+            auto* dst = memory_manager_.outputTensorPointers(param_, mutableBuffer)[0].get();
+
+            slice_node_->update_params(exec, slice_.getParams(src, dst, start_ + iter * stride_));
         }
 
     private:
@@ -112,12 +125,22 @@ private:
             throwIfError(cudaMemcpyAsync(dst, src, param_size_, cudaMemcpyDeviceToDevice, stream.get()));
         }
 
-        void capture(const CUDA::Stream& stream) {
+        void capture(const CUDA::Stream& stream, CUDA::DevicePointer<void*> mutableBuffer) {
             // // TODO: refactor
             // transfer_node_.emplace(CUDA::CaptureInfo{stream}.addTransferNode(
             //     CUDA::DevicePointer<void *>{dst_},
             //     CUDA::DevicePointer<const void *>{src_},
             //     count_));
+
+            const auto& paramTensors = memory_manager_.outputTensorPointers(param_, mutableBuffer);
+            const auto& resultTensors = memory_manager_.inputTensorPointers(result_, mutableBuffer);
+            auto* dst = paramTensors[0].get();
+            const auto* src = resultTensors[0].get();
+
+            transfer_node_.emplace(CUDA::CaptureInfo{stream}.addTransferNode(
+                CUDA::DevicePointer<void *>{dst},
+                CUDA::DevicePointer<const void *>{src},
+                param_size_));
         }
 
     private:
@@ -154,12 +177,25 @@ private:
             insert_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void capture(const CUDA::Stream& stream) {
+        void capture(const CUDA::Stream& stream,
+                     CUDA::DevicePointer<void*> mutableBuffer,
+                     const IOperationExec::Outputs& outputTensors) {
             // insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src_, dst_, start_)));
+            const auto* src = memory_manager_.inputTensorPointers(result_, mutableBuffer)[0].get();
+            auto* dst = outputTensors[output_idx_].get();
+
+            insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src, dst, start_)));
         }
 
-        inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
+        inline void update_capture(const CUDA::GraphExec& exec,
+                                   CUDA::DevicePointer<void*> mutableBuffer,
+                                   const IOperationExec::Outputs& outputTensors,
+                                   int64_t iter) {
             // insert_node_->update_params(exec, insert_.getParams(src_, dst_, start_ + iter * stride_));
+            const auto* src = memory_manager_.inputTensorPointers(result_, mutableBuffer)[0].get();
+            auto* dst = outputTensors[output_idx_].get();
+
+            insert_node_->update_params(exec, insert_.getParams(src, dst, start_ + iter * stride_));
         }
 
     private:
