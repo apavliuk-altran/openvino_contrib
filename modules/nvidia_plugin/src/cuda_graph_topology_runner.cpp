@@ -41,11 +41,11 @@ CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
     currentSequence.push_back(origSequence[0]);
     for (size_t i = 1; i < totalSize; ++i) {
         const auto& op = origSequence[i];
-        if (std::dynamic_pointer_cast<const TensorIteratorOp>(op)) {
-            isLastOpCompatible = !isLastOpCompatible;
-            sequences.emplace_back(std::move(currentSequence));
-            currentSequence.clear();
-        } else if (op->IsCudaGraphCompatible() != isLastOpCompatible) {
+        if (std::dynamic_pointer_cast<const TensorIteratorOp>(op) || op->IsCudaGraphCompatible() != isLastOpCompatible) {
+        //     isLastOpCompatible = !isLastOpCompatible;
+        //     sequences.emplace_back(std::move(currentSequence));
+        //     currentSequence.clear();
+        // } else if (op->IsCudaGraphCompatible() != isLastOpCompatible) {
             isLastOpCompatible = !isLastOpCompatible;
             sequences.emplace_back(std::move(currentSequence));
             currentSequence.clear();
@@ -68,9 +68,11 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
     std::size_t graphIndex = 0;
     for (auto& subgraph : subgraphs_) {
         if (auto ti = getTI(subgraph)) {
-            Workbuffers workbuffers{};
-            workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
-            const auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
+            // Workbuffers workbuffers{};
+            // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
+            // const auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
+            // CUDA::DevicePointer<void*> mutableBuffer = memoryBlock.view().data();
+            CUDA::DevicePointer<void*> mutableBuffer{memoryBlock.view().data()};
             const auto& memoryManager = *subgraph.memoryManager();
             const auto& inputTensors = memoryManager.inputTensorPointers(*ti, mutableBuffer);
             const auto& outputTensors = memoryManager.outputTensorPointers(*ti, mutableBuffer);
@@ -98,17 +100,19 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
 
     graphContext.reset();
     for (const auto& subgraph : subgraphs_) {
+        Workbuffers workbuffers{};
+        workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
         if (getTI(subgraph)) {
-            Workbuffers workbuffers{};
-            workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
+            // Workbuffers workbuffers{};
+            // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
             subgraph.Capture(context, {}, {}, workbuffers);
         } else if (subgraph.IsCudaGraphCompatible()) {
             graphContext.start_next_graph_addition();
             CUDA::GraphCapture capture{stream};
             {
                 auto scope = capture.getScope();
-                Workbuffers workbuffers{};
-                workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
+                // Workbuffers workbuffers{};
+                // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
                 subgraph.Capture(context, {}, {}, workbuffers);
             }
             const auto& graph = capture.getGraph();
