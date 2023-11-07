@@ -37,13 +37,17 @@ public:
                       CUDA::DevicePointer<const void*> src,
                       std::size_t size);
 
-    void add_slice(const std::string& ti_op_name,
-                   const CUDA::Stream& stream,
-                   std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+    // void add_slice(const std::string& ti_op_name,
+    //                const CUDA::Stream& stream,
+    //                std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
 
-    void add_insert(const std::string& ti_op_name,
+    void add_kernel(const std::string& ti_op_name,
                     const CUDA::Stream& stream,
-                    std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+                    const cudaKernelNodeParams& knp);
+
+    // void add_insert(const std::string& ti_op_name,
+    //                 const CUDA::Stream& stream,
+    //                 std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
 
     void add_graph(const CUDA::Graph& graph);
     void add_ti_graph(const std::string& ti_op_name, const CUDA::Graph& graph);
@@ -51,12 +55,15 @@ public:
     bool is_initialized() const;
 
     void update_capture(const TensorMappingContext& context);
-    void update_slice(const std::string& ti_op_name,
-                      std::size_t index,
-                      std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) const;
-    void update_insert(const std::string& ti_op_name,
+    // void update_slice(const std::string& ti_op_name,
+    //                   std::size_t index,
+    //                   std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) const;
+    void update_kernel(const std::string& ti_op_name,
                        std::size_t index,
-                       std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) const;
+                       const cudaKernelNodeParams& knp) const;
+    // void update_insert(const std::string& ti_op_name,
+    //                    std::size_t index,
+    //                    std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) const;
 
     void launch(std::size_t index, const CUDA::Stream& stream) const;
     void launch_ti_graph(const std::string& ti_op_name, const CUDA::Stream& stream) const;
@@ -65,8 +72,9 @@ public:
     std::size_t get_results_count() const;
 
     std::size_t get_transfers_count(const std::string& ti_op_name) const;
-    std::size_t get_slices_count(const std::string& ti_op_name) const;
-    std::size_t get_inserts_count(const std::string& ti_op_name) const;
+    // std::size_t get_slices_count(const std::string& ti_op_name) const;
+    std::size_t get_kernels_count(const std::string& ti_op_name) const;
+    // std::size_t get_inserts_count(const std::string& ti_op_name) const;
 
     std::size_t get_graphs_count() const;
 
@@ -98,16 +106,18 @@ private:
                           CUDA::DevicePointer<const void*> src,
                           std::size_t size);
 
-        void add_slice(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
-        void add_insert(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+        // void add_slice(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+        void add_kernel(const CUDA::Stream& stream, const cudaKernelNodeParams& knp);
+        // void add_insert(const CUDA::Stream& stream, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
 
         void set_graph(const CUDA::Graph& graph);
 
         bool is_initialized() const;
 
         void update_capture(const TensorMappingContext& context);
-        void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
-        void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
+        // void update_slice(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams);
+        void update_kernel(std::size_t index, const cudaKernelNodeParams& knp);
+        // void update_insert(std::size_t index, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams);
 
         void launch(const CUDA::Stream& stream) const;
 
@@ -115,8 +125,9 @@ private:
         std::size_t get_results_count() const;
 
         std::size_t get_transfers_count() const;
-        std::size_t get_slices_count() const;
-        std::size_t get_inserts_count() const;
+        // std::size_t get_slices_count() const;
+        std::size_t get_kernels_count() const;
+        // std::size_t get_inserts_count() const;
 
         friend bool operator==(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
         friend bool operator!=(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);
@@ -128,8 +139,9 @@ private:
         std::map<std::string, CUDA::DownloadNode> resultNodes_;
 
         std::vector<CUDA::TransferNode> transferNodes_;
-        std::vector<CUDA::SliceNode> sliceNodes_;
-        std::vector<CUDA::InsertNode> insertNodes_;
+        // std::vector<CUDA::SliceNode> sliceNodes_;
+        std::vector<CUDA::KernelNode> kernelNodes_;
+        // std::vector<CUDA::InsertNode> insertNodes_;
     };
 
     friend bool operator==(const CudaGraphInfo& lhs, const CudaGraphInfo& rhs);

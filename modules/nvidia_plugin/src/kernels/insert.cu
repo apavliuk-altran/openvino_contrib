@@ -37,6 +37,56 @@ Insert::Insert(const Type_t element_type, const Props& props, const size_t max_t
     : element_type_{element_type}, props_{props}, size_{shape_size(props.old_shape)} {
     TypeValidator<AllElementTypesSwitch>::check(element_type_);
     std::tie(num_blocks_, threads_per_block_) = calculateElementwiseGrid(size_, max_threads_per_block);
+    switch (element_type_) {
+        case Type_t::boolean:
+            // TODO: get rid of C-cast
+            params_.kernel = reinterpret_cast<void*>(&insert_part<bool>);
+            break;
+#ifdef CUDA_HAS_BF16_TYPE
+        case Type_t::bf16:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<__nv_bfloat16>);
+            break;
+#endif
+        case Type_t::f16:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<__half>);
+            break;
+        case Type_t::f32:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<float>);
+            break;
+        case Type_t::f64:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<double>);
+            break;
+        case Type_t::i8:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<int8_t>);
+            break;
+        case Type_t::i16:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<int16_t>);
+            break;
+        case Type_t::i32:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<int32_t>);
+            break;
+        case Type_t::i64:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<int64_t>);
+            break;
+        case Type_t::u8:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<uint8_t>);
+            break;
+        case Type_t::u16:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<uint16_t>);
+            break;
+        case Type_t::u32:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<uint32_t>);
+            break;
+        case Type_t::u64:
+            params_.kernel = reinterpret_cast<void*>(&insert_part<uint64_t>);
+            break;
+        default:
+            throw_ov_exception(fmt::format("Input element type = {} is not supported by Split operation !!",
+                                         static_cast<Type_t>(element_type_)));
+    }
+    params_.num_blocks = num_blocks_;
+    params_.threads_per_block = threads_per_block_;
+    params_.size = size_;
 }
 
 void Insert::operator()(const cudaStream_t stream, const void* src, void* dst, const size_t start) const {
@@ -75,66 +125,9 @@ void Insert::operator()(const cudaStream_t stream, const void* src, void* dst, c
     }
 }
 
-std::unique_ptr<Insert::Params> Insert::getParams(const void* src, void* dst, const size_t start) const {
-    auto res = std::make_unique<Insert::Params>();
-    Params& p = *res;
-    switch (element_type_) {
-        case Type_t::boolean:
-            // TODO: get rid of C-cast
-            p.kernel = (void*)&insert_part<bool>;
-            break;
-#ifdef CUDA_HAS_BF16_TYPE
-        case Type_t::bf16:
-            p.kernel = (void*)&insert_part<__nv_bfloat16>;
-            break;
-#endif
-        case Type_t::f16:
-            p.kernel = (void*)&insert_part<__half>;
-            break;
-        case Type_t::f32:
-            p.kernel = (void*)&insert_part<float>;
-            break;
-        case Type_t::f64:
-            p.kernel = (void*)&insert_part<double>;
-            break;
-        case Type_t::i8:
-            p.kernel = (void*)&insert_part<int8_t>;
-            break;
-        case Type_t::i16:
-            p.kernel = (void*)&insert_part<int16_t>;
-            break;
-        case Type_t::i32:
-            p.kernel = (void*)&insert_part<int32_t>;
-            break;
-        case Type_t::i64:
-            p.kernel = (void*)&insert_part<int64_t>;
-            break;
-        case Type_t::u8:
-            p.kernel = (void*)&insert_part<uint8_t>;
-            break;
-        case Type_t::u16:
-            p.kernel = (void*)&insert_part<uint16_t>;
-            break;
-        case Type_t::u32:
-            p.kernel = (void*)&insert_part<uint32_t>;
-            break;
-        case Type_t::u64:
-            p.kernel = (void*)&insert_part<uint64_t>;
-            break;
-        default:
-            throw_ov_exception(fmt::format("Input element type = {} is not supported by Split operation !!",
-                                         static_cast<Type_t>(element_type_)));
-    }
-    p.num_blocks = num_blocks_;
-    p.threads_per_block = threads_per_block_;
-    p.props = static_cast<const Props*>(props_ptr_);
-    p.start = start;
-    p.size = size_;
-    p.x = src;
-    p.y = dst;
-    // return p;
-    return res;
-}
+// std::unique_ptr<Insert::Params> Insert::getParams(const void* src, void* dst, const size_t start) const {
+//     return res;
+// }
 
 template <typename T>
 void Insert::call(const cudaStream_t stream, const void* src, void* dst, const size_t start) const {

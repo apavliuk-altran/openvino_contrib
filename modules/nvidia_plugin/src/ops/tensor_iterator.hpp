@@ -74,14 +74,16 @@ private:
             slice_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        inline std::unique_ptr<kernel::Slice::Params> get_params(const CUDA::Stream& stream,
-                                                                 CUDA::DevicePointer<void*> mutableBuffer,
-                                                                 const IOperationExec::Inputs& inputTensors,
-                                                                 int64_t iter) {
+        // inline std::unique_ptr<kernel::Slice::Params> get_params(const CUDA::Stream& stream,
+        inline const cudaKernelNodeParams& get_knp(const CUDA::Stream& stream,
+                                                   CUDA::DevicePointer<void*> mutableBuffer,
+                                                   const IOperationExec::Inputs& inputTensors,
+                                                   int64_t iter) {
             // slice_node_.emplace(CUDA::CaptureInfo{stream}.addSliceNode(slice_.getParams(src_, dst_, start_)));
             const auto* src = inputTensors[input_idx_].get();
             auto* dst = memory_manager_.outputTensorPointers(param_, mutableBuffer)[0].get();
-            return slice_.getParams(src, dst, start_ + iter * stride_);
+            // return slice_.getParams(src, dst, start_ + iter * stride_);
+            return slice_.getKnp(src, dst, start_ + iter * stride_);
         }
 
         // inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {
@@ -174,15 +176,17 @@ private:
             insert_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        inline std::unique_ptr<kernel::Insert::Params> get_params(const CUDA::Stream& stream,
-                                                                  CUDA::DevicePointer<void*> mutableBuffer,
-                                                                  const IOperationExec::Outputs& outputTensors,
-                                                                  int64_t iter) {
+        // inline std::unique_ptr<kernel::Insert::Params> get_params(const CUDA::Stream& stream,
+        inline const cudaKernelNodeParams& get_knp(const CUDA::Stream& stream,
+                                                   CUDA::DevicePointer<void*> mutableBuffer,
+                                                   const IOperationExec::Outputs& outputTensors,
+                                                   int64_t iter) {
             // insert_node_.emplace(CUDA::CaptureInfo{stream}.addInsertNode(insert_.getParams(src_, dst_, start_)));
             const auto* src = memory_manager_.inputTensorPointers(result_, mutableBuffer)[0].get();
             auto* dst = outputTensors[output_idx_].get();
 
-            return insert_.getParams(src, dst, start_ + iter * stride_);
+            // return insert_.getParams(src, dst, start_ + iter * stride_);
+            return insert_.getKnp(src, dst, start_ + iter * stride_);
         }
 
         // inline void update_capture(const CUDA::GraphExec& exec, int64_t iter) {

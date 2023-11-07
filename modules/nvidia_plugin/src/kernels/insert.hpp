@@ -23,7 +23,7 @@ public:
     };
 
     struct Params {
-        inline const cudaKernelNodeParams* getKnp() {
+        inline const cudaKernelNodeParams& getKnp() {
             knp_.func = kernel;
             knp_.gridDim = num_blocks;
             knp_.blockDim = threads_per_block;
@@ -35,7 +35,7 @@ public:
             args_[4] = &y;
             knp_.kernelParams = &args_[0];
             knp_.extra = nullptr;
-            return &knp_;
+            return knp_;
         }
 
         // inline operator==(const Params& rhs) {
@@ -70,7 +70,15 @@ public:
 
     void operator()(cudaStream_t stream, const void* src, void* dst, size_t start) const;
 
-    std::unique_ptr<Params> getParams(const void* src, void* dst, const size_t start) const;
+    // std::unique_ptr<Params> getParams(const void* src, void* dst, size_t start) const;
+    inline const cudaKernelNodeParams& getKnp(const void* src, void* dst, size_t start) const {
+        params_.start = start;
+        params_.x = src;
+        params_.y = dst;
+        // return p;
+        return params_.getKnp();
+    }
+
 
     size_t getImmutableWorkbufferSize() const;
     void setImmutableWorkbuffer(void* immutableBuffer);
@@ -85,6 +93,7 @@ private:
     size_t num_blocks_{};
     size_t threads_per_block_{};
     void* props_ptr_{};
+    mutable Params params_;
 };
 
 inline size_t Insert::getImmutableWorkbufferSize() const { return sizeof(props_); }
@@ -93,6 +102,7 @@ inline void Insert::setImmutableWorkbuffer(void* immutableBuffer) {
     kernel::throwIfError(
         cudaMemcpyAsync(immutableBuffer, static_cast<const void*>(&props_), sizeof(props_), cudaMemcpyHostToDevice));
     props_ptr_ = immutableBuffer;
+    params_.props = static_cast<const Props*>(props_ptr_);
 }
 
 }  // namespace kernel
