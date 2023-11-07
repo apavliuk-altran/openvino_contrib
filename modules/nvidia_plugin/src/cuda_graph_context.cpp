@@ -7,6 +7,50 @@
 namespace ov {
 namespace nvidia_gpu {
 
+void TiCudaGraphInfo::add_transfer(const CUDA::Stream& stream,
+                                                   CUDA::DevicePointer<void*> dst,
+                                                   CUDA::DevicePointer<const void*> src,
+                                                   std::size_t size) {
+    CUDA::CaptureInfo captureInfo{stream};
+    transferNodes_.emplace_back(captureInfo.addTransferNode(dst, src, size));
+}
+
+void TiCudaGraphInfo::add_kernel(const CUDA::Stream& stream, const cudaKernelNodeParams& knp) {
+    CUDA::CaptureInfo captureInfo{stream};
+    kernelNodes_.emplace_back(captureInfo.addKernelNode(knp));
+}
+
+void TiCudaGraphInfo::set_params_graph(const CUDA::Graph& graph) {
+    paramsGraph_.emplace(graph);
+    paramsGraphExec_.emplace(graph);
+}
+
+void TiCudaGraphInfo::set_body_graph(const CUDA::Graph& graph) {
+    bodyGraph_.emplace(graph);
+    bodyGraphExec_.emplace(graph);
+}
+
+void TiCudaGraphInfo::set_results_graph(const CUDA::Graph& graph) {
+    resultsGraph_.emplace(graph);
+    resultsGraphExec_.emplace(graph);
+}
+
+// bool TiCudaGraphInfo::is_initialized() const { return graph_.has_value() && graphExec_.has_value(); }
+
+void TiCudaGraphInfo::update_kernel(std::size_t index, const cudaKernelNodeParams& knp) {
+    kernelNodes_[index].update_params(bodyGraphExec_.value(), knp);
+}
+
+void TiCudaGraphInfo::launch_params_graph(const CUDA::Stream& stream) const { paramsGraphExec_.value().launch(stream); }
+
+void TiCudaGraphInfo::launch_body_graph(const CUDA::Stream& stream) const { bodyGraphExec_.value().launch(stream); }
+
+void TiCudaGraphInfo::launch_results_graph(const CUDA::Stream& stream) const { resultsGraphExec_.value().launch(stream); }
+
+std::size_t TiCudaGraphInfo::get_transfers_count() const { return transferNodes_.size(); }
+
+std::size_t TiCudaGraphInfo::get_kernels_count() const { return kernelNodes_.size(); }
+
 void CudaGraphContext::reset() {
     graphs_.clear();
     currentGraphIndex_ = 0;
@@ -17,9 +61,9 @@ void CudaGraphContext::start_next_graph_addition() {
     graphs_.emplace_back();
 }
 
-void CudaGraphContext::start_ti_graph_addition(const std::string& ti_op_name) {
-    ti_graphs_[ti_op_name] = {};
-}
+// void CudaGraphContext::start_ti_graph_addition(const std::string& ti_op_name) {
+//     ti_graphs_[ti_op_name] = {};
+// }
 
 void CudaGraphContext::add_parameter(const std::string& tensorName,
                                      const CUDA::Stream& stream,
@@ -39,27 +83,35 @@ void CudaGraphContext::add_result(const std::string& tensorName,
     graphs_[currentGraphIndex_].add_result(tensorName, stream, dst, src, size);
 }
 
-void CudaGraphContext::add_transfer(const std::string& ti_op_name,
-                                    const CUDA::Stream& stream,
-                                    CUDA::DevicePointer<void*> dst,
-                                    CUDA::DevicePointer<const void*> src,
-                                    std::size_t size) {
-    ti_graphs_.at(ti_op_name).add_transfer(stream, dst, src, size);
-}
+// void CudaGraphContext::add_transfer(const std::string& ti_op_name,
+//                                     const CUDA::Stream& stream,
+//                                     CUDA::DevicePointer<void*> dst,
+//                                     CUDA::DevicePointer<const void*> src,
+//                                     std::size_t size) {
+//     ti_graphs_.at(ti_op_name).add_transfer(stream, dst, src, size);
+// }
 
-void CudaGraphContext::add_kernel(const std::string& ti_op_name,
-                                  const CUDA::Stream& stream,
-                                  const cudaKernelNodeParams& knp) {
-    ti_graphs_.at(ti_op_name).add_kernel(stream, knp);
-}
+// void CudaGraphContext::add_kernel(const std::string& ti_op_name,
+//                                   const CUDA::Stream& stream,
+//                                   const cudaKernelNodeParams& knp) {
+//     ti_graphs_.at(ti_op_name).add_kernel(stream, knp);
+// }
 
 void CudaGraphContext::add_graph(const CUDA::Graph& graph) {
     OPENVINO_ASSERT(currentGraphIndex_ < graphs_.size(), "Graph index/vector size incosistency");
     graphs_[currentGraphIndex_].set_graph(graph);
 }
 
-void CudaGraphContext::add_ti_graph(const std::string& ti_op_name, const CUDA::Graph& graph) {
-    ti_graphs_.at(ti_op_name).set_graph(graph);
+// void CudaGraphContext::add_ti_graph(const std::string& ti_op_name, const CUDA::Graph& graph) {
+//     ti_graphs_.at(ti_op_name).set_graph(graph);
+// }
+
+// const TiCudaGraphInfo& CudaGraphContext::get_ti_graph(const std::string& ti_op_name) const {
+//     return ti_graphs_.at(ti_op_name);
+// }
+
+TiCudaGraphInfo& CudaGraphContext::get_ti_graph(const std::string& ti_op_name) const {
+    return ti_graphs_[ti_op_name];
 }
 
 bool CudaGraphContext::is_initialized() const {
@@ -73,12 +125,12 @@ void CudaGraphContext::update_capture(const TensorMappingContext& context) {
     }
 }
 
-void CudaGraphContext::update_kernel(const std::string& ti_op_name,
-                                    std::size_t index,
-                                    const cudaKernelNodeParams& knp) const {
-    OPENVINO_ASSERT(ti_graphs_.at(ti_op_name).is_initialized(), "TI graph not initialized");
-    ti_graphs_.at(ti_op_name).update_kernel(index, knp);
-}
+// void CudaGraphContext::update_kernel(const std::string& ti_op_name,
+//                                     std::size_t index,
+//                                     const cudaKernelNodeParams& knp) const {
+//     OPENVINO_ASSERT(ti_graphs_.at(ti_op_name).is_initialized(), "TI graph not initialized");
+//     ti_graphs_.at(ti_op_name).update_kernel(index, knp);
+// }
 
 void CudaGraphContext::launch(std::size_t index, const CUDA::Stream& stream) const {
     currentGraphIndex_ = index;
@@ -86,10 +138,10 @@ void CudaGraphContext::launch(std::size_t index, const CUDA::Stream& stream) con
     graphs_[currentGraphIndex_].launch(stream);
 }
 
-void CudaGraphContext::launch_ti_graph(const std::string& ti_op_name, const CUDA::Stream& stream) const {
-    OPENVINO_ASSERT(ti_graphs_.at(ti_op_name).is_initialized(), "TI graph not initialized");
-    ti_graphs_.at(ti_op_name).launch(stream);
-}
+// void CudaGraphContext::launch_ti_graph(const std::string& ti_op_name, const CUDA::Stream& stream) const {
+//     OPENVINO_ASSERT(ti_graphs_.at(ti_op_name).is_initialized(), "TI graph not initialized");
+//     ti_graphs_.at(ti_op_name).launch(stream);
+// }
 
 std::size_t CudaGraphContext::get_params_count() const {
     std::size_t res = 0;
@@ -107,13 +159,13 @@ std::size_t CudaGraphContext::get_results_count() const {
     return res;
 }
 
-std::size_t CudaGraphContext::get_transfers_count(const std::string& ti_op_name) const {
-        return ti_graphs_.at(ti_op_name).get_transfers_count();
-}
+// std::size_t CudaGraphContext::get_transfers_count(const std::string& ti_op_name) const {
+//         return ti_graphs_.at(ti_op_name).get_transfers_count();
+// }
 
-std::size_t CudaGraphContext::get_kernels_count(const std::string& ti_op_name) const {
-    return ti_graphs_.at(ti_op_name).get_kernels_count();
-}
+// std::size_t CudaGraphContext::get_kernels_count(const std::string& ti_op_name) const {
+//     return ti_graphs_.at(ti_op_name).get_kernels_count();
+// }
 
 std::size_t CudaGraphContext::get_graphs_count() const {
     return graphs_.size();
@@ -137,18 +189,18 @@ void CudaGraphContext::CudaGraphInfo::add_result(const std::string& tensorName,
     resultNodes_.emplace(tensorName, captureInfo.addDownloadNode(dst, src, size));
 }
 
-void CudaGraphContext::CudaGraphInfo::add_transfer(const CUDA::Stream& stream,
-                                                   CUDA::DevicePointer<void*> dst,
-                                                   CUDA::DevicePointer<const void*> src,
-                                                   std::size_t size) {
-    CUDA::CaptureInfo captureInfo{stream};
-    transferNodes_.emplace_back(captureInfo.addTransferNode(dst, src, size));
-}
+// void CudaGraphContext::CudaGraphInfo::add_transfer(const CUDA::Stream& stream,
+//                                                    CUDA::DevicePointer<void*> dst,
+//                                                    CUDA::DevicePointer<const void*> src,
+//                                                    std::size_t size) {
+//     CUDA::CaptureInfo captureInfo{stream};
+//     transferNodes_.emplace_back(captureInfo.addTransferNode(dst, src, size));
+// }
 
-void CudaGraphContext::CudaGraphInfo::add_kernel(const CUDA::Stream& stream, const cudaKernelNodeParams& knp) {
-    CUDA::CaptureInfo captureInfo{stream};
-    kernelNodes_.emplace_back(captureInfo.addKernelNode(knp));
-}
+// void CudaGraphContext::CudaGraphInfo::add_kernel(const CUDA::Stream& stream, const cudaKernelNodeParams& knp) {
+//     CUDA::CaptureInfo captureInfo{stream};
+//     kernelNodes_.emplace_back(captureInfo.addKernelNode(knp));
+// }
 
 void CudaGraphContext::CudaGraphInfo::set_graph(const CUDA::Graph& graph) {
     graph_.emplace(graph);
@@ -166,9 +218,9 @@ void CudaGraphContext::CudaGraphInfo::update_capture(const TensorMappingContext&
     }
 }
 
-void CudaGraphContext::CudaGraphInfo::update_kernel(std::size_t index, const cudaKernelNodeParams& knp) {
-    kernelNodes_[index].update_params(graphExec_.value(), knp);
-}
+// void CudaGraphContext::CudaGraphInfo::update_kernel(std::size_t index, const cudaKernelNodeParams& knp) {
+//     kernelNodes_[index].update_params(graphExec_.value(), knp);
+// }
 
 void CudaGraphContext::CudaGraphInfo::launch(const CUDA::Stream& stream) const { graphExec_.value().launch(stream); }
 
@@ -176,9 +228,9 @@ std::size_t CudaGraphContext::CudaGraphInfo::get_params_count() const { return p
 
 std::size_t CudaGraphContext::CudaGraphInfo::get_results_count() const { return resultNodes_.size(); }
 
-std::size_t CudaGraphContext::CudaGraphInfo::get_transfers_count() const { return transferNodes_.size(); }
+// std::size_t CudaGraphContext::CudaGraphInfo::get_transfers_count() const { return transferNodes_.size(); }
 
-std::size_t CudaGraphContext::CudaGraphInfo::get_kernels_count() const { return kernelNodes_.size(); }
+// std::size_t CudaGraphContext::CudaGraphInfo::get_kernels_count() const { return kernelNodes_.size(); }
 
 bool operator==(const CudaGraphContext::CudaGraphInfo& lhs, const CudaGraphContext::CudaGraphInfo& rhs) {
     return lhs.graph_ == rhs.graph_ && lhs.graphExec_ == rhs.graphExec_ && lhs.parameterNodes_ == rhs.parameterNodes_ &&
