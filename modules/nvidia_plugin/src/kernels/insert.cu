@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2021 Intel Corporation
+// Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -39,7 +39,6 @@ Insert::Insert(const Type_t element_type, const Props& props, const size_t max_t
     std::tie(num_blocks_, threads_per_block_) = calculateElementwiseGrid(size_, max_threads_per_block);
     switch (element_type_) {
         case Type_t::boolean:
-            // TODO: get rid of C-cast
             params_.kernel = reinterpret_cast<void*>(&insert_part<bool>);
             break;
 #ifdef CUDA_HAS_BF16_TYPE
@@ -124,10 +123,6 @@ void Insert::operator()(const cudaStream_t stream, const void* src, void* dst, c
                                          static_cast<Type_t>(element_type_)));
     }
 }
-
-// std::unique_ptr<Insert::Params> Insert::getParams(const void* src, void* dst, const size_t start) const {
-//     return res;
-// }
 
 template <typename T>
 void Insert::call(const cudaStream_t stream, const void* src, void* dst, const size_t start) const {

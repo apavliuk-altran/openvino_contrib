@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2021 Intel Corporation
+// Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -40,8 +40,6 @@ Slice::Slice(const Type_t element_type, const Props &props, const size_t max_thr
     Params& p = params_;
     switch (element_type_) {
         case Type_t::boolean:
-            // TODO: get rid of C-cast
-            // params_.kernel = (void*)&slice_part<bool>;
             params_.kernel = reinterpret_cast<void*>(&slice_part<bool>);
             break;
 #ifdef CUDA_HAS_BF16_TYPE
@@ -128,9 +126,6 @@ void Slice::operator()(cudaStream_t stream, const void *src, void *dst, const si
                             static_cast<Type_t>(element_type_)));
     }
 }
-
-// std::unique_ptr<Slice::Params> Slice::getParams(const void* src, void* dst, const size_t start) const {
-// }
 
 template <typename T>
 void Slice::call(cudaStream_t stream, const void *src, void *dst, size_t start) const {

@@ -132,20 +132,6 @@ TransferNode CaptureInfo::addTransferNode(CUDA::DevicePointer<void *> dst,
     return TransferNode{newNode, dst, src, size};
 }
 
-// InsertNode CaptureInfo::addInsertNode(std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
-//     cudaGraphNode_t newNode;
-//     throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, insertParams->getKnp()));
-//     throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
-//     return InsertNode{newNode, std::move(insertParams)};
-// }
-
-// SliceNode CaptureInfo::addSliceNode(std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
-//     cudaGraphNode_t newNode;
-//     throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, sliceParams->getKnp()));
-//     throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
-//     return SliceNode{newNode, std::move(sliceParams)};
-// }
-
 KernelNode CaptureInfo::addKernelNode(const cudaKernelNodeParams& knp) {
     cudaGraphNode_t newNode;
     throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, &knp));
@@ -161,8 +147,7 @@ void UploadNode::update_src(const GraphExec& exec, const void *src) {
     }
 }
 
-UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src,
-                       std::size_t size)
+UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src, std::size_t size)
     : node_{node},
       dst_{dst},
       src_{src},
@@ -177,8 +162,7 @@ void DownloadNode::update_dst(const GraphExec& exec, void *dst) {
     }
 }
 
-DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src,
-                           std::size_t size)
+DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src, std::size_t size)
     : node_{node},
       dst_{dst},
       src_{src},
@@ -201,28 +185,7 @@ CUDA::TransferNode::TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void 
       size_{size} {
 }
 
-// void CUDA::InsertNode::update_params(const GraphExec &exec, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams) {
-//     insert_params_ = std::move(insertParams);
-//     throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, insert_params_->getKnp()));
-// }
-
-// CUDA::InsertNode::InsertNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Insert::Params> insertParams)
-//     : node_{node},
-//       insert_params_{std::move(insertParams)} {
-// }
-
-// void CUDA::SliceNode::update_params(const GraphExec &exec, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams) {
-//     slice_params_ = std::move(sliceParams);
-//     throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, slice_params_->getKnp()));
-// }
-
-// CUDA::SliceNode::SliceNode(cudaGraphNode_t node, std::unique_ptr<ov::nvidia_gpu::kernel::Slice::Params> sliceParams)
-//     : node_{node},
-//       slice_params_{std::move(sliceParams)} {
-// }
-
 CUDA::KernelNode::KernelNode(cudaGraphNode_t node, const cudaKernelNodeParams &knp) : node_{node}, knp_{&knp} {}
-// CUDA::KernelNode::KernelNode(cudaGraphNode_t node) : node_{node} {}
 
 bool UploadNode::operator==(const UploadNode &rhs) const {
     return size_ == rhs.size_ && src_ == rhs.src_ && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
@@ -235,13 +198,5 @@ bool DownloadNode::operator==(const DownloadNode &rhs) const {
 bool CUDA::TransferNode::operator==(const TransferNode &rhs) const {
     return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
 }
-
-// bool CUDA::InsertNode::operator==(const InsertNode &rhs) const {
-//     return insert_params_ == rhs.insert_params_ && node_ == rhs.node_;
-// }
-
-// bool CUDA::SliceNode::operator==(const SliceNode &rhs) const {
-//     return slice_params_ == rhs.slice_params_ && node_ == rhs.node_;
-// }
 
 } // namespace CUDA

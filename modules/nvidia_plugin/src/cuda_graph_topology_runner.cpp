@@ -42,10 +42,6 @@ CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
     for (size_t i = 1; i < totalSize; ++i) {
         const auto& op = origSequence[i];
         if (std::dynamic_pointer_cast<const TensorIteratorOp>(op) || op->IsCudaGraphCompatible() != isLastOpCompatible) {
-        //     isLastOpCompatible = !isLastOpCompatible;
-        //     sequences.emplace_back(std::move(currentSequence));
-        //     currentSequence.clear();
-        // } else if (op->IsCudaGraphCompatible() != isLastOpCompatible) {
             isLastOpCompatible = !isLastOpCompatible;
             sequences.emplace_back(std::move(currentSequence));
             currentSequence.clear();
@@ -68,17 +64,11 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
     std::size_t graphIndex = 0;
     for (auto& subgraph : subgraphs_) {
         if (auto ti = getTI(subgraph)) {
-            // Workbuffers workbuffers{};
-            // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
-            // const auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
-            // CUDA::DevicePointer<void*> mutableBuffer = memoryBlock.view().data();
             CUDA::DevicePointer<void*> mutableBuffer{memoryBlock.view().data()};
             const auto& memoryManager = *subgraph.memoryManager();
             const auto& inputTensors = memoryManager.inputTensorPointers(*ti, mutableBuffer);
             const auto& outputTensors = memoryManager.outputTensorPointers(*ti, mutableBuffer);
             const auto& workBuffers = memoryManager.workBuffers(*ti, mutableBuffer);
-            // TODO: avoid const_cast
-            // ti->ExecuteGraph(const_cast<InferenceRequestContext&>(context), inputTensors, outputTensors, workBuffers);
             ti->ExecuteGraph(context, inputTensors, outputTensors, workBuffers);
         } else if (subgraph.IsCudaGraphCompatible()) {
             context.getCudaGraphContext().launch(graphIndex, stream);
@@ -93,8 +83,6 @@ void CudaGraphTopologyRunner::Run(const InferenceRequestContext& context, const 
 
 void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
                                       const DeviceMemBlock& memoryBlock) const {
-    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-
     const auto& stream = context.getThreadContext().stream();
     auto& graphContext = context.getCudaGraphContext();
 
@@ -103,16 +91,12 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
         Workbuffers workbuffers{};
         workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
         if (getTI(subgraph)) {
-            // Workbuffers workbuffers{};
-            // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
             subgraph.Capture(context, {}, {}, workbuffers);
         } else if (subgraph.IsCudaGraphCompatible()) {
             graphContext.start_next_graph_addition();
             CUDA::GraphCapture capture{stream};
             {
                 auto scope = capture.getScope();
-                // Workbuffers workbuffers{};
-                // workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
                 subgraph.Capture(context, {}, {}, workbuffers);
             }
             const auto& graph = capture.getGraph();
@@ -121,12 +105,6 @@ void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
     }
     // OPENVINO_ASSERT(graphContext.get_graphs_count() == GetCudaGraphsCount(),
     //                 "CudaGraphTopologyRunner/CudaGraphContext graphs count mismatch");
-
-    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
-    // std::cout << "CudaGraphTopologyRunner::Capture(): " <<
-    //              std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << " ms\n";
-    // std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 const SubGraph& CudaGraphTopologyRunner::GetSubGraph() const {

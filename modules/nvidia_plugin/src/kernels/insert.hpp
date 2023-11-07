@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2021 Intel Corporation
+// Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -38,18 +38,6 @@ public:
             return knp_;
         }
 
-        // inline operator==(const Params& rhs) {
-        //     return kernel == rhs.kernel &&
-        //            num_blocks == rhs.num_blocks &&
-        //            threads_per_block == rhs.threads_per_block &&
-        //            props == rhs.props &&
-        //            start == rhs.start &&
-        //            size == rhs.size &&
-        //            x == rhs.x &&
-        //            y == rhs.y &&
-        //            knp == rhs.knp_
-        // }
-
         void* kernel;
         size_t num_blocks;
         size_t threads_per_block;
@@ -70,12 +58,10 @@ public:
 
     void operator()(cudaStream_t stream, const void* src, void* dst, size_t start) const;
 
-    // std::unique_ptr<Params> getParams(const void* src, void* dst, size_t start) const;
     inline const cudaKernelNodeParams& getKnp(const void* src, void* dst, size_t start) const {
         params_.start = start;
         params_.x = src;
         params_.y = dst;
-        // return p;
         return params_.getKnp();
     }
 
