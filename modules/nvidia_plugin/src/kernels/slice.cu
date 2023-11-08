@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2021 Intel Corporation
+// Copyright (C) 2018-2023 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -36,6 +36,56 @@ Slice::Slice(const Type_t element_type, const Props &props, const size_t max_thr
     : element_type_{element_type}, props_{props}, size_{shape_size(props.new_shape)} {
     TypeValidator<AllElementTypesSwitch>::check(element_type_);
     std::tie(num_blocks_, threads_per_block_) = calculateElementwiseGrid(size_, max_threads_per_block);
+
+    switch (element_type_) {
+        case Type_t::boolean:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<bool>);
+            break;
+#ifdef CUDA_HAS_BF16_TYPE
+        case Type_t::bf16:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<__nv_bfloat16>);
+            break;
+#endif
+        case Type_t::f16:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<__half>);
+            break;
+        case Type_t::f32:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<float>);
+            break;
+        case Type_t::f64:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<double>);
+            break;
+        case Type_t::i8:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<int8_t>);
+            break;
+        case Type_t::i16:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<int16_t>);
+            break;
+        case Type_t::i32:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<int32_t>);
+            break;
+        case Type_t::i64:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<int64_t>);
+            break;
+        case Type_t::u8:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<uint8_t>);
+            break;
+        case Type_t::u16:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<uint16_t>);
+            break;
+        case Type_t::u32:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<uint32_t>);
+            break;
+        case Type_t::u64:
+            params_.kernel = reinterpret_cast<void*>(&slice_part<uint64_t>);
+            break;
+        default:
+            throw_ov_exception(fmt::format("Input element type = {} is not supported by Split operation !!",
+                                        static_cast<Type_t>(element_type_)));
+    }
+    params_.num_blocks = num_blocks_;
+    params_.threads_per_block = threads_per_block_;
+    params_.size = size_;
 }
 
 void Slice::operator()(cudaStream_t stream, const void *src, void *dst, const size_t start) const {
