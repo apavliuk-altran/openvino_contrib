@@ -113,11 +113,44 @@ private:
     std::size_t size_;
 };
 
+class TransferNode {
+    friend CaptureInfo;
+
+public:
+    void update_ptrs(const GraphExec &exec, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src);
+    bool operator==(const TransferNode& rhs) const;
+
+private:
+    TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void*> dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    cudaGraphNode_t node_;
+    CUDA::DevicePointer<void*> dst_;
+    CUDA::DevicePointer<const void*> src_;
+    std::size_t size_;
+};
+
+class KernelNode {
+    friend CaptureInfo;
+
+public:
+    inline void update_params(const GraphExec& exec, const cudaKernelNodeParams& knp) {
+        knp_ = &knp;
+        throwIfError(cudaGraphExecKernelNodeSetParams(exec.get(), node_, knp_));
+    }
+    bool operator==(const KernelNode& rhs) const;
+
+private:
+    KernelNode(cudaGraphNode_t node, const cudaKernelNodeParams& knp);
+    cudaGraphNode_t node_;
+    const cudaKernelNodeParams* knp_;
+};
+
 class CaptureInfo {
 public:
     CaptureInfo(const Stream& capturedStream);
     UploadNode addUploadNode(CUDA::DevicePointer<void*> dst, const void* src, std::size_t size);
     DownloadNode addDownloadNode(void* dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    TransferNode addTransferNode(CUDA::DevicePointer<void*> dst, CUDA::DevicePointer<const void*> src, std::size_t size);
+    KernelNode addKernelNode(const cudaKernelNodeParams& knp);
 
 private:
     const Stream& stream_;

@@ -122,6 +122,23 @@ DownloadNode CaptureInfo::addDownloadNode(void *dst, DevicePointer<const void*> 
     return DownloadNode{newNode, dst, src, size};
 }
 
+TransferNode CaptureInfo::addTransferNode(CUDA::DevicePointer<void *> dst,
+                                          CUDA::DevicePointer<const void *> src,
+                                          std::size_t size) {
+    cudaGraphNode_t newNode;
+    throwIfError(cudaGraphAddMemcpyNode1D(&newNode, capturingGraph_, deps_, depCount_,
+            dst.get(), src.get(), size, cudaMemcpyDeviceToDevice));
+    throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
+    return TransferNode{newNode, dst, src, size};
+}
+
+KernelNode CaptureInfo::addKernelNode(const cudaKernelNodeParams& knp) {
+    cudaGraphNode_t newNode;
+    throwIfError(cudaGraphAddKernelNode(&newNode, capturingGraph_, deps_, depCount_, &knp));
+    throwIfError(cudaStreamUpdateCaptureDependencies(stream_.get(), &newNode, 1, 1));
+    return KernelNode{newNode, knp};
+}
+
 void UploadNode::update_src(const GraphExec& exec, const void *src) {
     if (src_ != src) {
         throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
@@ -130,8 +147,7 @@ void UploadNode::update_src(const GraphExec& exec, const void *src) {
     }
 }
 
-UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src,
-                       std::size_t size)
+UploadNode::UploadNode(cudaGraphNode_t node, DevicePointer<void*> dst, const void *src, std::size_t size)
     : node_{node},
       dst_{dst},
       src_{src},
@@ -146,20 +162,44 @@ void DownloadNode::update_dst(const GraphExec& exec, void *dst) {
     }
 }
 
-DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src,
-                           std::size_t size)
+DownloadNode::DownloadNode(cudaGraphNode_t node, void *dst, DevicePointer<const void*> src, std::size_t size)
     : node_{node},
       dst_{dst},
       src_{src},
       size_{size} {
 }
 
-bool UploadNode::operator ==(const UploadNode &rhs) const {
+void CUDA::TransferNode::update_ptrs(const GraphExec &exec, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src) {
+    if (dst_ != dst && src_ != src) {
+        throwIfError(cudaGraphExecMemcpyNodeSetParams1D(exec.get(), node_,
+                dst.get(), src_.get(), size_, cudaMemcpyDeviceToDevice));
+        dst_ = dst;
+        src_ = src;
+    }
+}
+
+CUDA::TransferNode::TransferNode(cudaGraphNode_t node, CUDA::DevicePointer<void *> dst, CUDA::DevicePointer<const void *> src, std::size_t size)
+    : node_{node},
+      dst_{dst},
+      src_{src},
+      size_{size} {
+}
+
+CUDA::KernelNode::KernelNode(cudaGraphNode_t node, const cudaKernelNodeParams &knp) : node_{node}, knp_{&knp} {}
+
+bool UploadNode::operator==(const UploadNode &rhs) const {
     return size_ == rhs.size_ && src_ == rhs.src_ && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
 }
 
-bool DownloadNode::operator ==(const DownloadNode &rhs) const {
+bool DownloadNode::operator==(const DownloadNode &rhs) const {
     return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_ == rhs.dst_ && node_ == rhs.node_;
 }
 
+bool CUDA::TransferNode::operator==(const TransferNode &rhs) const {
+    return size_ == rhs.size_ && src_.get() == rhs.src_.get() && dst_.get() == rhs.dst_.get() && node_ == rhs.node_;
+}
+
+bool KernelNode::operator==(const KernelNode &rhs) const {
+    return *knp_ == *rhs.knp_ && node == rhs.node_;
+}
 } // namespace CUDA
