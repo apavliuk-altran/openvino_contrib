@@ -62,12 +62,12 @@ private:
             slice_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void add_kernel_node(CudaGraphInfo& info,
+        void add_kernel_node(ICudaGraphInfo& info,
                              const CUDA::Stream& stream,
                              CUDA::DevicePointer<void*> mutableBuffer,
                              const IOperationExec::Inputs& inputTensors);
 
-        void update_kernel_node(CudaGraphInfo& info,
+        void update_kernel_node(ICudaGraphInfo& info,
                                 std::size_t index,
                                 CUDA::DevicePointer<void*> mutableBuffer,
                                 const IOperationExec::Inputs& inputTensors,
@@ -98,7 +98,7 @@ private:
             throwIfError(cudaMemcpyAsync(dst, src, param_size_, cudaMemcpyDeviceToDevice, stream.get()));
         }
 
-        void add_transfer_node(CudaGraphInfo& info,
+        void add_transfer_node(ICudaGraphInfo& info,
                                const CUDA::Stream& stream,
                                CUDA::DevicePointer<void*> mutableBuffer);
 
@@ -122,12 +122,12 @@ private:
             insert_(stream.get(), src, dst, start_ + iter * stride_);
         }
 
-        void add_kernel_node(CudaGraphInfo& info,
+        void add_kernel_node(ICudaGraphInfo& info,
                              const CUDA::Stream& stream,
                              CUDA::DevicePointer<void*> mutableBuffer,
                              const IOperationExec::Outputs& outputTensors);
 
-        void update_kernel_node(CudaGraphInfo& info,
+        void update_kernel_node(ICudaGraphInfo& info,
                                 std::size_t index,
                                 CUDA::DevicePointer<void*> mutableBuffer,
                                 const IOperationExec::Outputs& outputTensors,

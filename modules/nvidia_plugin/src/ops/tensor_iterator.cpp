@@ -307,7 +307,7 @@ TensorIteratorOp::SliceLauncher::SliceLauncher(const TensorIteratorOp& ti, uint6
     stride_ = portMap.stride;
 }
 
-void TensorIteratorOp::SliceLauncher::add_kernel_node(CudaGraphInfo& info,
+void TensorIteratorOp::SliceLauncher::add_kernel_node(ICudaGraphInfo& info,
                                                       const CUDA::Stream& stream,
                                                       CUDA::DevicePointer<void*> mutableBuffer,
                                                       const IOperationExec::Inputs& inputTensors) {
@@ -331,7 +331,7 @@ TensorIteratorOp::TransferLauncher::TransferLauncher(const TensorIteratorOp& ti,
     OPENVINO_ASSERT(param_size_ == resultSize, "Node name: ", ti.GetName());
 }
 
-void TensorIteratorOp::TransferLauncher::add_transfer_node(CudaGraphInfo& info,
+void TensorIteratorOp::TransferLauncher::add_transfer_node(ICudaGraphInfo& info,
                                                            const CUDA::Stream& stream,
                                                            CUDA::DevicePointer<void*> mutableBuffer) {
     const auto& paramTensors = memory_manager_.outputTensorPointers(param_, mutableBuffer);
@@ -355,7 +355,7 @@ TensorIteratorOp::InsertLauncher::InsertLauncher(const TensorIteratorOp& ti,
     stride_ = portMap.stride;
 }
 
-void TensorIteratorOp::InsertLauncher::add_kernel_node(CudaGraphInfo& info,
+void TensorIteratorOp::InsertLauncher::add_kernel_node(ICudaGraphInfo& info,
                                                        const CUDA::Stream& stream,
                                                        CUDA::DevicePointer<void*> mutableBuffer,
                                                        const IOperationExec::Outputs& outputTensors) {
