@@ -11,7 +11,7 @@ namespace nvidia_gpu {
 
 class CudaGraphTopologyRunner final : public ITopologyRunner {
 public:
-    CudaGraphTopologyRunner(const CreationContext& context, const std::shared_ptr<const ov::Model>& model);
+    CudaGraphTopologyRunner(const CreationContext& context, const std::shared_ptr<const ov::Model>& model, std::size_t treeLevel = 0);
     ~CudaGraphTopologyRunner() override = default;
 
     void Run(InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const override;
@@ -27,6 +27,7 @@ private:
     std::vector<SubGraph> subgraphs_;
     SubGraph orig_subgraph_;
     std::size_t cuda_graphs_count_;
+    std::size_t tree_level_;
 };
 
 }  // namespace nvidia_gpu

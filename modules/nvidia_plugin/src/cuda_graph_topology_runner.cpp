@@ -11,8 +11,16 @@ namespace ov {
 namespace nvidia_gpu {
 
 CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
-                                                 const std::shared_ptr<const ov::Model>& model)
-    : orig_subgraph_{context, model}, cuda_graphs_count_{0} {
+                                                 const std::shared_ptr<const ov::Model>& model,
+                                                 std::size_t treeLevel)
+    : orig_subgraph_{context, model}, cuda_graphs_count_{0}, tree_level_{treeLevel} {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    for (std::size_t i = 0; i < tree_level_; ++i) {
+        std::cout << '\t';
+    }
+    std::cout << "CudaGraphTopologyRunner::CudaGraphTopologyRunner(): tree_level_ = " << tree_level_ << '\n';
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+
     std::vector<SubGraph::ExecSequence> sequences;
     SubGraph::ExecSequence currentSequence;
     const auto& origSequence = orig_subgraph_.getExecSequence();
@@ -27,6 +35,9 @@ CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
             lastOpCompatibility = c;
             sequences.emplace_back(std::move(currentSequence));
             currentSequence.clear();
+        }
+        if (auto ti = std::dynamic_pointer_cast<TensorIteratorOp>(op)) {
+            ti->initializeRunner(tree_level_ + 1);
         }
         currentSequence.push_back(op);
     }

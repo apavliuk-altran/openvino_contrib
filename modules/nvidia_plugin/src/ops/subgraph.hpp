@@ -6,6 +6,7 @@
 
 #include <cuda_op_buffers_extractor.hpp>
 #include <cuda_operation_base.hpp>
+// #include <cuda_itopology_runner.hpp>
 #include <memory_manager/cuda_memory_manager.hpp>
 #include <memory_manager/cuda_memory_pool.hpp>
 
@@ -13,6 +14,8 @@
 
 namespace ov {
 namespace nvidia_gpu {
+
+class ITopologyRunner;
 
 class SubGraph : public OperationBase {
 public:
@@ -44,6 +47,8 @@ public:
                       Outputs outputTensors,
                       const Workbuffers& workbuffers) const override;
 
+    void initializeRunner(std::size_t treeLevel);
+
     inline std::shared_ptr<MemoryManager> memoryManager() const { return memory_manager_; }
 
     inline const std::vector<OperationBase::Ptr>& getExecSequence() const { return exec_sequence_; }
@@ -55,7 +60,7 @@ public:
 
 private:
     void initSharedImmutableWorkbuffers(const std::vector<OperationBase::Ptr>& init_sequence);
-    void initExecuteSequence(const CreationContext& context, bool isStableParams, bool isStableResults);
+    void initExecuteSequence(bool isStableParams, bool isStableResults);
     static std::unique_ptr<MemoryManager> createMemoryManager(const OperationBuffersExtractor& opBuffersExtractor);
     std::vector<DevicePointer<void*>> getSharedWorkbuffers(const IOperationExec& operation);
 
@@ -90,6 +95,10 @@ protected:
     std::vector<OperationBase::Ptr> results_;
     std::vector<OperationInfo> results_info_;
     std::shared_ptr<const ov::Model> model_;
+
+    const CreationContext& creation_context_;
+    // TODO: Add Intermediary class between Subgraph and TI and move there
+    std::shared_ptr<ITopologyRunner> runner_ = nullptr;
 
     mutable CudaGraphCompatibility graph_compatibility_;
     mutable bool is_compatibility_analyzed_ = false;
