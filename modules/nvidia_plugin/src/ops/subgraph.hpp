@@ -6,7 +6,7 @@
 
 #include <cuda_op_buffers_extractor.hpp>
 #include <cuda_operation_base.hpp>
-// #include <cuda_itopology_runner.hpp>
+#include <cuda_itopology_runner.hpp>
 #include <memory_manager/cuda_memory_manager.hpp>
 #include <memory_manager/cuda_memory_pool.hpp>
 
@@ -15,7 +15,7 @@
 namespace ov {
 namespace nvidia_gpu {
 
-class ITopologyRunner;
+// class ITopologyRunner;
 
 class SubGraph : public OperationBase {
 public:
@@ -25,8 +25,8 @@ public:
 
     SubGraph(const CreationContext& context,
              const std::shared_ptr<const ov::Model>& model,
-             ExecSequence&& sequence,
-             std::shared_ptr<MemoryManager> memoryManager);
+             const ExecSequence& sequence,
+             const std::shared_ptr<MemoryManager>& memoryManager);
 
     virtual ~SubGraph() = default;
 
@@ -47,6 +47,18 @@ public:
                       Outputs outputTensors,
                       const Workbuffers& workbuffers) const override;
 
+    // void Capture(InferenceRequestContext& context,
+    //              Inputs inputTensors,
+    //              Outputs outputTensors,
+    //              const Workbuffers& workbuffers,
+    //              ICudaGraphInfo& graphContext) const;
+
+    // void ExecuteGraph(InferenceRequestContext& context,
+    //                   Inputs inputTensors,
+    //                   Outputs outputTensors,
+    //                   const Workbuffers& workbuffers,
+    //                   ICudaGraphInfo& graphContext) const;
+
     void initializeRunner(std::size_t treeLevel);
 
     inline std::shared_ptr<MemoryManager> memoryManager() const { return memory_manager_; }
@@ -58,11 +70,19 @@ public:
     const std::vector<OperationBase::Ptr>& getParams() const;
     const std::vector<OperationBase::Ptr>& getResults() const;
 
+    // TODO: Remove?
+    // ITopologyRunner& getRunner() {
+    //     OPENVINO_ASSERT(runner != nullptr, "runner_ wasn't initialized for SubGraph");
+    //     return *runner;
+    // }
+
 private:
     void initSharedImmutableWorkbuffers(const std::vector<OperationBase::Ptr>& init_sequence);
     void initExecuteSequence(bool isStableParams, bool isStableResults);
     static std::unique_ptr<MemoryManager> createMemoryManager(const OperationBuffersExtractor& opBuffersExtractor);
     std::vector<DevicePointer<void*>> getSharedWorkbuffers(const IOperationExec& operation);
+
+    // bool hasRunner() { return runner_ != nullptr; }
 
 protected:
     using SubGraphOp = ov::op::util::SubGraphOp;
@@ -97,8 +117,11 @@ protected:
     std::shared_ptr<const ov::Model> model_;
 
     const CreationContext& creation_context_;
+    
     // TODO: Add Intermediary class between Subgraph and TI and move there
+    // TODO: Is this type optimal?
     std::shared_ptr<ITopologyRunner> runner_ = nullptr;
+    // std::unique_ptr<ITopologyRunner> runner_ = nullptr;
 
     mutable CudaGraphCompatibility graph_compatibility_;
     mutable bool is_compatibility_analyzed_ = false;

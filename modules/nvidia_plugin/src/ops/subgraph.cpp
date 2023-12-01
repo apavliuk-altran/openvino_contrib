@@ -39,8 +39,8 @@ SubGraph::SubGraph(const CreationContext& context, const std::shared_ptr<const o
 
 SubGraph::SubGraph(const CreationContext& context,
                    const std::shared_ptr<const ov::Model>& model,
-                   ExecSequence&& sequence,
-                   std::shared_ptr<MemoryManager> memoryManager)
+                   const ExecSequence& sequence,
+                   const std::shared_ptr<MemoryManager>& memoryManager)
     : OperationBase{context, nullptr},
       memory_manager_{memoryManager},
       exec_sequence_{sequence},
@@ -153,9 +153,13 @@ CudaGraphCompatibility SubGraph::GetCudaGraphCompatibility() const {
             if (opCompatability == CudaGraphCompatibility::SPECIAL) {
                 graph_compatibility_ = opCompatability;
             } else if (opCompatability == CudaGraphCompatibility::NONE) {
+            // if (opCompatability == CudaGraphCompatibility::NONE) {
                 graph_compatibility_ = opCompatability;
                 break;
             }
+            // if (std::dynamic_pointer_cast<SubGraph>(op)) {
+            //     graph_compatibility_ = CudaGraphCompatibility::NESTED;
+            // }
         }
         is_compatibility_analyzed_ = true;
     }
@@ -163,13 +167,18 @@ CudaGraphCompatibility SubGraph::GetCudaGraphCompatibility() const {
 }
 
 void SubGraph::Capture(InferenceRequestContext& context, Inputs, Outputs, const Workbuffers& workbuffers) const {
-    const auto& stream = context.getThreadContext().stream();
-    const auto& memoryManager = *memory_manager_;
-    auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
+        // // auto compatibility = GetCudaGraphCompatibility();
+        // if (GetCudaGraphCompatibility() == CudaGraphCompatibility::NESTED) {
+        //     runner_->Capture(context, workbuffers);
+        // } else {
+            const auto& stream = context.getThreadContext().stream();
+            const auto& memoryManager = *memory_manager_;
+            auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
 
-    auto& executionDelegator = context.getExecutionDelegator();
-    executionDelegator.set_stream(stream);
-    executionDelegator.capture_sequence(this, memoryManager, mutableBuffer, context);
+            auto& executionDelegator = context.getExecutionDelegator();
+            executionDelegator.set_stream(stream);
+            executionDelegator.capture_sequence(this, memoryManager, mutableBuffer, context);
+        // }
 }
 
 void SubGraph::ExecuteGraph(InferenceRequestContext& context,
@@ -185,8 +194,28 @@ void SubGraph::ExecuteGraph(InferenceRequestContext& context,
     executionDelegator.execute_graph_sequence(this, memoryManager, mutableBuffer, context);
 }
 
+// TODO: Get rid of treeLevel?
 void SubGraph::initializeRunner(std::size_t treeLevel) {
-    runner_ = std::make_unique<CudaGraphTopologyRunner>(creation_context_, model_, treeLevel);
+    // auto newModel = model_->clone();
+    // // TODO: optimize erasing from vector?
+    // // for (auto& param : newModel->get_parameters() ) {
+    // const auto& params = newModel->get_parameters();
+    // // for (std::size_t i = params.size() - 1; i >= 0; --i) {
+    //     // newModel->remove_parameter(params[i]);
+    // for (auto it = params.rbegin(); it != params.rend(); ++it) {
+    //     newModel->remove_parameter(*it);
+    // }
+    // const auto& results = newModel->get_results();
+    // // for (auto& result : newModel->get_results() ) {
+    // // for (std::size_t i = results.size() - 1; i >= 0; --i) {
+    // //     newModel->remove_result(results[i]);
+    // for (auto it = results.rbegin(); it != results.rend(); ++it) {
+    //     newModel->remove_result(*it);
+    // }
+    // TODO: move to CudaGraphTopologyRunner?
+    runner_ = std::make_shared<CudaGraphTopologyRunner>(creation_context_, model_, exec_sequence_, memory_manager_, treeLevel);
+    // runner_ = std::make_shared<CudaGraphTopologyRunner>(creation_context_, newModel, treeLevel);
+    // runner_ = std::make_unique<CudaGraphTopologyRunner>(creation_context_, model_, treeLevel);
 
 
 

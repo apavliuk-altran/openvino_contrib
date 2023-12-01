@@ -10,10 +10,9 @@
 namespace ov {
 namespace nvidia_gpu {
 
-CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
-                                                 const std::shared_ptr<const ov::Model>& model,
-                                                 std::size_t treeLevel)
-    : orig_subgraph_{context, model}, cuda_graphs_count_{0}, tree_level_{treeLevel} {
+CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context, const SubGraph& subgraph, std::size_t treeLevel)
+    : orig_subgraph_(subgraph), cuda_graphs_count_{0}, tree_level_{treeLevel} {
+
     std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
     for (std::size_t i = 0; i < tree_level_; ++i) {
         std::cout << '\t';
@@ -29,77 +28,125 @@ CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
 
     CudaGraphCompatibility lastOpCompatibility = origSequence[0]->GetCudaGraphCompatibility();
     currentSequence.push_back(origSequence[0]);
-    for (size_t i = 1; i < totalSize; ++i) {
+    for (std::size_t i = 1; i < totalSize; ++i) {
         const auto& op = origSequence[i];
-        if (auto c = op->GetCudaGraphCompatibility(); c != lastOpCompatibility) {
-            lastOpCompatibility = c;
+        auto comp = op->GetCudaGraphCompatibility(); 
+        if (comp != lastOpCompatibility || comp == CudaGraphCompatibility::SPECIAL) {
+            lastOpCompatibility = comp;
             sequences.emplace_back(std::move(currentSequence));
             currentSequence.clear();
         }
-        if (auto ti = std::dynamic_pointer_cast<TensorIteratorOp>(op)) {
-            ti->initializeRunner(tree_level_ + 1);
+        if (comp == CudaGraphCompatibility::SPECIAL) {
+            auto sg = std::dynamic_pointer_cast<SubGraph>(op);
+            sg->initializeRunner(tree_level_ + 1);
         }
         currentSequence.push_back(op);
     }
     sequences.emplace_back(std::move(currentSequence));
 
+    const auto& model = orig_subgraph_.getModel();
     const auto& memoryManager = orig_subgraph_.memoryManager();
-    for (auto&& sequence : sequences) {
-        subgraphs_.emplace_back(context, model, std::move(sequence), memoryManager);
+    for (const auto& sequence : sequences) {
+        // subgraphs_.emplace_back(context, model, std::move(sequence), memoryManager);
+        subgraphs_.emplace_back(context, model, sequence, memoryManager);
         if (subgraphs_.back().GetCudaGraphCompatibility() != CudaGraphCompatibility::NONE) {
             ++cuda_graphs_count_;
         }
     }
 }
 
-void CudaGraphTopologyRunner::Run(InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const {
+CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
+                                                 const std::shared_ptr<const ov::Model>& model,
+                                                 std::size_t treeLevel)
+    : CudaGraphTopologyRunner(context, {context, model}, treeLevel) {}
+//     : orig_subgraph_{context, model}, cuda_graphs_count_{0}, tree_level_{treeLevel} {
+// }
+
+CudaGraphTopologyRunner::CudaGraphTopologyRunner(const CreationContext& context,
+                                                 const std::shared_ptr<const ov::Model>& model,
+                                                 const SubGraph::ExecSequence& sequence,
+                                                 const std::shared_ptr<MemoryManager>& memoryManager,
+                                                 std::size_t treeLevel)
+    : CudaGraphTopologyRunner(context, {context, model, sequence, memoryManager}, treeLevel) {}
+
+void CudaGraphTopologyRunner::Run(InferenceRequestContext& context, const Workbuffers& workbuffers) const {
+// void CudaGraphTopologyRunner::Run(InferenceRequestContext& context, const Workbuffers& workbuffers, ICudaGraphInfo& graphContext) const {
     const auto& stream = context.getThreadContext().stream();
-    auto& graphContext = context.getCudaGraphContext();
+    // auto& graphContext = context.getCudaGraphContext();
+    // auto& graphContext = context.getCudaGraphContext().get_current_graph();
+    auto& graphContext = context.getCurrentCudaGraphInfo();
     std::size_t graphIndex = 0;
     for (auto& subgraph : subgraphs_) {
         auto compatibility = subgraph.GetCudaGraphCompatibility();
         if (compatibility == CudaGraphCompatibility::FULL) {
             graphContext.select_current_graph(graphIndex);
-            graphContext.get_current_graph_info().launch(stream);
+            // graphContext.get_current_graph().launch(stream);
+            graphContext.launch(stream);
             graphIndex++;
         } else if (compatibility == CudaGraphCompatibility::SPECIAL) {
-            Workbuffers workbuffers{};
-            workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
             graphContext.select_current_graph(graphIndex);
+            context.setCurrentCudaGraphInfo(graphContext.get_current_graph());
             subgraph.ExecuteGraph(context, {}, {}, workbuffers);
             graphIndex++;
+        // } else if (compatibility == CudaGraphCompatibility::NESTED) {
+        //     graphContext.select_current_graph(graphIndex);
+        //     subgraph.getRunner().Run(context, workbuffers);
+        //     graphIndex++;
         } else {
-            Workbuffers workbuffers{};
-            workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
             subgraph.Execute(context, {}, {}, workbuffers);
+        }
+    }
+}
+
+void CudaGraphTopologyRunner::Run(InferenceRequestContext& context, const DeviceMemBlock& memoryBlock) const {
+    Workbuffers workbuffers{};
+    workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
+    context.setCurrentCudaGraphInfo(context.getCudaGraphContext());
+    // Run(context, workbuffers, context.getCudaGraphContext());
+    Run(context, workbuffers);
+}
+
+void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context, const Workbuffers& workbuffers) const {
+// void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context, const Workbuffers& workbuffers, ICudaGraphInfo& graphContext) const {
+    const auto& stream = context.getThreadContext().stream();
+    // auto& graphInfo = context.getCudaGraphContext().get_current_graph();
+    auto& graphContext = context.getCurrentCudaGraphInfo();
+    graphContext.reset();
+    for (const auto& subgraph : subgraphs_) {
+        auto compatibility = subgraph.GetCudaGraphCompatibility();
+        if (compatibility == CudaGraphCompatibility::FULL) {
+            graphContext.add(CudaGraphInfo::create());
+            CUDA::GraphCapture capture{stream};
+            {
+                auto scope = capture.getScope();
+                subgraph.Capture(context, {}, {}, workbuffers);
+            }
+            // const auto& graph = capture.getGraph();
+            // graphInfo.set_current_graph(graph);
+            graphContext.set_current_graph(capture.getGraph());
+        } else if (compatibility == CudaGraphCompatibility::SPECIAL) {
+            // graphInfo.add(CudaGraphInfo::create());
+            // graphContext.add(CudaGraphContext::create());
+            auto& currentGraphContext = graphContext.add(CudaGraphContext::create());
+            context.setCurrentCudaGraphInfo(currentGraphContext);
+            subgraph.Capture(context, {}, {}, workbuffers);
+        // } else if (compatibility == CudaGraphCompatibility::NESTED) {
+        //     graphInfo.add(CudaGraphContext::create());
+        //     // subgraph.Capture(context, {}, {}, workbuffers);
+        //     subgraph.getRunner().Capture(context, workbuffers);
         }
     }
 }
 
 void CudaGraphTopologyRunner::Capture(InferenceRequestContext& context,
                                       const DeviceMemBlock& memoryBlock) const {
-    const auto& stream = context.getThreadContext().stream();
-    auto& graphContext = context.getCudaGraphContext();
-
-    graphContext.reset();
-    for (const auto& subgraph : subgraphs_) {
-        Workbuffers workbuffers{};
-        workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
-        auto compatibility = subgraph.GetCudaGraphCompatibility();
-        if (compatibility == CudaGraphCompatibility::FULL) {
-            graphContext.add_new_graph_info();
-            CUDA::GraphCapture capture{stream};
-            {
-                auto scope = capture.getScope();
-                subgraph.Capture(context, {}, {}, workbuffers);
-            }
-            const auto& graph = capture.getGraph();
-            graphContext.set_current_graph(graph);
-        } else if (compatibility == CudaGraphCompatibility::SPECIAL) {
-            graphContext.add_new_graph_info();
-            subgraph.Capture(context, {}, {}, workbuffers);
-        }
-    }
+    Workbuffers workbuffers{};
+    workbuffers.mutable_buffers.emplace_back(memoryBlock.view().data());
+    // auto& graphInfo = context.getCudaGraphContext();
+    // Capture(graphInfo, workbuffers);
+    context.setCurrentCudaGraphInfo(context.getCudaGraphContext());
+    // Capture(context, workbuffers, context.getCudaGraphContext());
+    Capture(context, workbuffers);
 }
 
 const SubGraph& CudaGraphTopologyRunner::GetSubGraph() const {

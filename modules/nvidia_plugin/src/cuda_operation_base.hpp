@@ -30,6 +30,7 @@ namespace nvidia_gpu {
 template <typename T>
 using DevicePointer = CUDA::DevicePointer<T>;
 
+// enum class CudaGraphCompatibility { NONE, FULL, NESTED };
 enum class CudaGraphCompatibility { NONE, FULL, SPECIAL };
 
 class IOperationExec {

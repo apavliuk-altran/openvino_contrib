@@ -62,13 +62,22 @@ public:
     [[nodiscard]] const CudaGraphContext& getCudaGraphContext() const { return cuda_graph_context_; }
     [[nodiscard]] CudaGraphContext& getCudaGraphContext() { return cuda_graph_context_; }
 
+    void setCurrentCudaGraphInfo(ICudaGraphInfo& info) { current_cuda_graph_info_ = &info; }
+
+    ICudaGraphInfo& getCurrentCudaGraphInfo() {
+        OPENVINO_ASSERT(current_cuda_graph_info_, "current_cuda_graph_info_ is nullptr");
+        return *current_cuda_graph_info_;
+    }
+
 private:
     const ThreadContext& threadContext;
     CancellationToken& token;
     IExecutionDelegator& executionDelegator;
     const TensorMappingContext tensor_mapping_context_;
+    // TODO: Change to ICudaGraphInfo?
     CudaGraphContext& cuda_graph_context_;
     bool is_benchmark_mode_;
+    ICudaGraphInfo* current_cuda_graph_info_ = nullptr;
 };
 
 }  // namespace nvidia_gpu

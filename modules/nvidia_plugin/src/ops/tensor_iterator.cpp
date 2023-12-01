@@ -213,9 +213,47 @@ CudaGraphCompatibility TensorIteratorOp::GetCudaGraphCompatibility() const {
     if (iterations_results_map_.size() != 1 || iterations_results_map_.count(num_iterations_ - 1) == 0) {
         return CudaGraphCompatibility::NONE;
     }
+    // TODO: Refactor
     return SubGraph::GetCudaGraphCompatibility() == CudaGraphCompatibility::NONE ? CudaGraphCompatibility::NONE
                                                                                  : CudaGraphCompatibility::SPECIAL;
+    // return SubGraph::GetCudaGraphCompatibility();
 }
+
+// void TensorIteratorOp::Capture(InferenceRequestContext& context,
+//                                Inputs inputTensors,
+//                                Outputs outputTensors,
+//                                const Workbuffers& workbuffers) const {
+//     const auto& stream = context.getThreadContext().stream();
+//     const auto& memoryManager = *memory_manager_;
+//     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
+//     auto& executionDelegator = context.getExecutionDelegator();
+//     executionDelegator.set_stream(stream);
+//     auto& graphInfo = context.getCudaGraphContext().get_current_graph();
+
+//     CUDA::GraphCapture capture{stream};
+//     {
+//         auto scope = capture.getScope();
+//         // Input mapping of ports
+//         for (auto& slice : slices_) {
+//             slice.add_kernel_node(graphInfo, stream, mutableBuffer, inputTensors);
+//         }
+
+//         // Inner loop
+//         executionDelegator.capture_sequence(this, memoryManager, mutableBuffer, context);
+
+//         // Back-edge mapping
+//         for (auto& transfer : transfers_) {
+//             transfer.add_transfer_node(graphInfo, stream, mutableBuffer);
+//         }
+
+//         // Output mapping of ports
+//         for (auto& insert : inserts_) {
+//             insert.add_kernel_node(graphInfo, stream, mutableBuffer, outputTensors);
+//         }
+//     }
+    // graphInfo.set_graph(capture.getGraph());
+    // graphInfo.set_current_graph(capture.getGraph());
+// }
 
 void TensorIteratorOp::Capture(InferenceRequestContext& context,
                                Inputs inputTensors,
@@ -226,30 +264,43 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
     auto& executionDelegator = context.getExecutionDelegator();
     executionDelegator.set_stream(stream);
-    auto& graphInfo = context.getCudaGraphContext().get_current_graph_info();
+    // auto& graphContext = context.getCudaGraphContext().get_current_graph();
+    auto& graphContext = context.getCurrentCudaGraphInfo();
 
+    graphContext.add(CudaGraphInfo::create());
     CUDA::GraphCapture capture{stream};
     {
         auto scope = capture.getScope();
         // Input mapping of ports
         for (auto& slice : slices_) {
-            slice.add_kernel_node(graphInfo, stream, mutableBuffer, inputTensors);
+            slice.add_kernel_node(graphContext, stream, mutableBuffer, inputTensors);
         }
+    }
+    // graphContext.set_graph(capture.getGraph());
+    graphContext.set_current_graph(capture.getGraph());
+        // // Inner loop
+        // executionDelegator.capture_sequence(this, memoryManager, mutableBuffer, context);
 
-        // Inner loop
-        executionDelegator.capture_sequence(this, memoryManager, mutableBuffer, context);
+    auto& bodyGraphInfo = graphContext.add(CudaGraphContext::create());
+    context.setCurrentCudaGraphInfo(bodyGraphInfo);
+    runner_->Capture(context, workbuffers);
 
+    graphContext.add(CudaGraphInfo::create());
+    CUDA::GraphCapture capture2{stream};
+    {
+        auto scope = capture2.getScope();
         // Back-edge mapping
         for (auto& transfer : transfers_) {
-            transfer.add_transfer_node(graphInfo, stream, mutableBuffer);
+            transfer.add_transfer_node(graphContext, stream, mutableBuffer);
         }
 
         // Output mapping of ports
         for (auto& insert : inserts_) {
-            insert.add_kernel_node(graphInfo, stream, mutableBuffer, outputTensors);
+            insert.add_kernel_node(graphContext, stream, mutableBuffer, outputTensors);
         }
     }
-    graphInfo.set_graph(capture.getGraph());
+    // graphContext.set_graph(capture2.getGraph());
+    graphContext.set_current_graph(capture2.getGraph());
 }
 
 void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
@@ -271,19 +322,34 @@ void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
         }
     }
 
-    auto& graphInfo = context.getCudaGraphContext().get_current_graph_info();
-    OPENVINO_ASSERT(graphInfo.get_kernels_count() == slices_.size() + inserts_.size(),
+    // auto& graphInfo = context.getCudaGraphContext().get_current_graph();
+    auto& graphContext = context.getCurrentCudaGraphInfo();
+    OPENVINO_ASSERT(graphContext.get_kernels_count() == slices_.size() + inserts_.size(),
                     "CudaGraphContext/TensorIteratorOp slices or inserts count incosistency");
 
+    OPENVINO_ASSERT(graphContext.get_graphs_count() == 3, "Current graphContext should contain 3 sub-elements");
     // TI body loop
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+        // TODO: select graphs outside of the loop
+        graphContext.select_current_graph(0);
         for (std::size_t i = 0; i < slices_.size(); ++i) {
-            slices_[i].update_kernel_node(graphInfo, i, mutableBuffer, inputTensors, iter);
+            // slices_[i].update_kernel_node(graphInfo, i, mutableBuffer, inputTensors, iter);
+            slices_[i].update_kernel_node(graphContext.get_current_graph(), i, mutableBuffer, inputTensors, iter);
         }
+        graphContext.launch(stream);
+
+        graphContext.select_current_graph(1);
+        context.setCurrentCudaGraphInfo(graphContext.get_current_graph());
+        runner_->Run(context, workbuffers);
+
+        graphContext.select_current_graph(2);
         for (std::size_t i = 0; i < inserts_.size(); ++i) {
-            inserts_[i].update_kernel_node(graphInfo, i + slices_.size(), mutableBuffer, outputTensors, iter);
+            // inserts_[i].update_kernel_node(graphInfo, i + slices_.size(), mutableBuffer, outputTensors, iter);
+            // inserts_[i].update_kernel_node(graphContext.get_current_graph(), i + slices_.size(), mutableBuffer, outputTensors, iter);
+            inserts_[i].update_kernel_node(graphContext.get_current_graph(), i, mutableBuffer, outputTensors, iter);
         }
-        graphInfo.launch(stream);
+        graphContext.launch(stream);
+        // graphInfo.launch(stream);
     }
 
     // Copy data to output; this part doesn't use CUDA graphs yet

@@ -57,10 +57,10 @@ std::size_t CudaGraphInfo::get_graphs_count() const {
     return is_initialized() ? 1 : 0;
 }
 
-void CudaGraphInfo::set_graph(const CUDA::Graph& graph) {
-    graph_.emplace(graph);
-    graphExec_.emplace(graph);
-}
+// void CudaGraphInfo::set_graph(const CUDA::Graph& graph) {
+//     graph_.emplace(graph);
+//     graphExec_.emplace(graph);
+// }
 
 void CudaGraphInfo::launch(const CUDA::Stream& stream) const { graphExec_.value().launch(stream); }
 
@@ -112,7 +112,8 @@ void CudaGraphContext::add_transfer(const CUDA::Stream& stream,
 
 void CudaGraphContext::set_current_graph(const CUDA::Graph& graph) {
     OPENVINO_ASSERT(currentGraphIndex_ < graphs_.size(), "Graph index/vector size incosistency");
-    graphs_[currentGraphIndex_]->set_graph(graph);
+    // graphs_[currentGraphIndex_]->set_graph(graph);
+    graphs_[currentGraphIndex_]->set_current_graph(graph);
 }
 
 bool CudaGraphContext::is_initialized() const {
@@ -126,17 +127,42 @@ void CudaGraphContext::update_capture(const TensorMappingContext& context) {
     }
 }
 
-void CudaGraphContext::add_new_graph_info() {
+// void CudaGraphContext::add(std::shared_ptr<ICudaGraphInfo> ptr) {
+ICudaGraphInfo& CudaGraphContext::add(std::shared_ptr<ICudaGraphInfo> ptr) {
+// void CudaGraphContext::add(std::unique_ptr<ICudaGraphInfo> ptr) {
     currentGraphIndex_ = graphs_.size();
-    graphs_.emplace_back(std::make_unique<CudaGraphInfo>());
+    // if (type == GraphInfoType::INFO) {
+    //     graphs_.emplace_back(std::make_unique<CudaGraphInfo>());
+    // } else if (type == GraphInfoType::CONTEXT) {
+    //     graphs_.emplace_back(std::make_unique<CudaGraphContext>());
+    // }
     // graphs_.emplace_back(std::make_shared<CudaGraphInfo>());
+    graphs_.emplace_back(ptr);
+    return *graphs_.back();
 }
 
 // TODO: rename?
-const ICudaGraphInfo& CudaGraphContext::get_current_graph_info() const { return *graphs_[currentGraphIndex_]; }
+// const ICudaGraphInfo& CudaGraphContext::get_current_graph() const {
+//     const auto* graphInfoPtr = graphs_[currentGraphIndex_].get();
+//     while (graphInfoPtr->is_nested()) {
+//         graphInfoPtr = &(graphInfoPtr->get_current_graph());
+//     }
+//     return *graphInfoPtr;
+// }
 
 // TODO: rename?
-ICudaGraphInfo& CudaGraphContext::get_current_graph_info() { return *graphs_[currentGraphIndex_]; }
+// ICudaGraphInfo& CudaGraphContext::get_current_graph() {
+//     if (graphs_.size() == 0) {
+//         return *this;
+//     }
+//     auto* graphInfoPtr = graphs_[currentGraphIndex_].get();
+//     while (graphInfoPtr->is_nested()) {
+//         graphInfoPtr = &(graphInfoPtr->get_current_graph());
+//     }
+//     return *graphInfoPtr;
+// }
+// ICudaGraphInfo& CudaGraphContext::get_current_graph_info() { return *graphs_[currentGraphIndex_]; }
+ICudaGraphInfo& CudaGraphContext::get_current_graph() { return *graphs_[currentGraphIndex_]; }
 
 void CudaGraphContext::select_current_graph(std::size_t index) {
     OPENVINO_ASSERT(index < graphs_.size(), "Graph index/vector size incosistency");
@@ -181,9 +207,9 @@ std::size_t CudaGraphContext::get_kernels_count() const {
 
 std::size_t CudaGraphContext::get_graphs_count() const { return graphs_.size(); }
 
-void CudaGraphContext::set_graph(const CUDA::Graph& graph) {
-    graphs_[currentGraphIndex_]->set_graph(graph);
-}
+// void CudaGraphContext::set_graph(const CUDA::Graph& graph) {
+//     graphs_[currentGraphIndex_]->set_graph(graph);
+// }
 
 void CudaGraphContext::launch(const CUDA::Stream& stream) const {
     graphs_[currentGraphIndex_]->launch(stream);
