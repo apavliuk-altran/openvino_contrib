@@ -25,6 +25,12 @@ TensorIteratorOp::TensorIteratorOp(const CreationContext& context,
                                    IndexCollection&& inputIds,
                                    IndexCollection&& outputIds)
     : SubGraph(context, op, std::move(inputIds), std::move(outputIds)), num_iterations_{op.get_num_iterations()} {
+
+    std::cout << "================================================================================================\n";
+    std::cout << "TensorIteratorOp::TensorIteratorOp()\n";
+    std::cout << "================================================================================================\n";
+
+
     // Set trip count, initial execution condition, num iteration primitives
     // they should be mutable_data to prevent from being optimized out
     if (num_iterations_ < 0) {
@@ -338,8 +344,10 @@ void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
     graphContext.select_current_graph(2);
     auto& postInfo = graphContext.get_current_graph();
 
+    std::cout << "************************************************************************************************\n";
     // TI body loop
     for (int64_t iter = 0; iter < num_iterations_; ++iter) {
+        std::cout << iter << ' ';
         // TODO: select graphs outside of the loop
         // graphContext.select_current_graph(0);
         for (std::size_t i = 0; i < slices_.size(); ++i) {
@@ -366,6 +374,8 @@ void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
         // graphContext.launch(stream);
         postInfo.launch(stream);
     }
+    std::cout << '\n';
+    std::cout << "************************************************************************************************\n";
 
     // Copy data to output; this part doesn't use CUDA graphs yet
     if (iterations_results_map_.count(num_iterations_ - 1) > 0) {

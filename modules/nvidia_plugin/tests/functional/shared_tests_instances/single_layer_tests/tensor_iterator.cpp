@@ -20,6 +20,11 @@ using ov::test::utils::TensorIteratorBody;
 namespace LayerTestsDefinitions {
 
 class TensorIteratorDisabledTransformationsTest : public TensorIteratorTest {
+public:
+    InferenceEngine::Blob::Ptr GenerateInput(const InferenceEngine::InputInfo& inputInfo) const override {
+        return FuncTestUtils::createAndFillBlob(inputInfo.getTensorDesc(), 20, -10);
+    }
+
 protected:
     void SetUp() override { TensorIteratorTest::SetUp(); }
 };
