@@ -50,9 +50,9 @@ void validateOutput(const ov::Tensor& tensor, const std::vector<CalcType>& refVe
     EXPECT_EQ(size, refVector.size());
     const auto* ptr = getConstPtr(tensor);
     bool areEqual = std::equal(ptr, ptr + size, refVector.cbegin(), [threshold](auto val1, auto val2) {
-////
-        std::cout << "val1  = " << static_cast<float>(val1) << ", val2 = " << static_cast<float>(val2) << '\n';
-////
+// ////
+//         std::cout << "val1  = " << static_cast<float>(val1) << ", val2 = " << static_cast<float>(val2) << '\n';
+// ////
         return std::abs(val1 - val2) < threshold;
     });
     EXPECT_TRUE(areEqual);
@@ -61,7 +61,7 @@ void validateOutput(const ov::Tensor& tensor, const std::vector<CalcType>& refVe
 }  // namespace
 
 // TODO: Get rid of ngraph::*
-class GRU {
+class GRUTI {
 public:
     static std::shared_ptr<ov::Model> createNetwork() {
         // ov::element::Type prc = CALC_ELEMENT_TYPE;
@@ -117,6 +117,173 @@ public:
         ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(gru_cell->output(0)),
                                         std::make_shared<ngraph::opset1::Result>(unsqueeze)};
         auto body = std::make_shared<ngraph::Function>(results, body_params, "gru_cell");
+        tensor_iterator->set_function(body);
+
+        // 2. Set PortMap
+        // if (direction == ngraph::op::RecurrentSequenceDirection::FORWARD) {
+            // tensor_iterator->set_sliced_input(body_params[0], outer_params[0], 0, 1, 1, -1, sequence_axis);
+            // tensor_iterator->get_concatenated_slices(results[1], 0, 1, 1, -1, sequence_axis);
+        // } else if (direction == ngraph::op::RecurrentSequenceDirection::REVERSE) {
+            tensor_iterator->set_sliced_input(body_params[0], outer_params[0], -1, -1, 1, 0, sequence_axis);
+            tensor_iterator->get_concatenated_slices(results[1], -1, -1, 1, 0, sequence_axis);
+        // } else {
+        //     NGRAPH_CHECK(false, "Bidirectional case is not supported.");
+        // }
+
+        tensor_iterator->set_merged_input(body_params[1], outer_params[1], results[0]);
+        tensor_iterator->get_iter_value(results[0]);
+
+        // 3. Outer function
+        // function = std::make_shared<ngraph::Function>(ngraph::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
+        return std::make_shared<ov::Model>(ov::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
+    }
+
+    static void checkContext(const CudaGraphContext& cudaGraphContext) {
+        // AddMul network should have a single CUDA Graph
+        // EXPECT_EQ(cudaGraphContext.get_graphs_count(), 1);
+    }
+
+    static void checkSubGraph(const SubGraph& subGraph) {
+        // Original SubGraph for AddMul network should be CUDA Graph compatible
+        // EXPECT_EQ(subGraph.GetCudaGraphCompatibility(), CudaGraphCompatibility::FULL);
+    }
+
+    static std::vector<std::vector<CalcType>> calcRefs(
+        std::shared_ptr<ov::Model> model,
+        const std::vector<std::shared_ptr<ov::Tensor>>& inputs) {
+    //     EXPECT_EQ(inputTensors.size(), INPUTS_COUNT);
+    //     const auto size = inputTensors[0]->get_size();
+    //     std::vector<std::vector<CalcType>> result{std::vector<CalcType>(size)};
+    //     std::array<const CalcType*, INPUTS_COUNT> inputs;
+    //     for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+    //         inputs[i] = getConstPtr(*inputTensors[i]);
+    //     }
+    //     EXPECT_EQ(result.size(), 1);
+    //     auto& output = result[0];
+    //     for (std::size_t i = 0; i < size; ++i) {
+    //         output[i] = (inputs[0][i] + inputs[1][i]) * ((inputs[2][i] + inputs[3][i]));
+    //     }
+    //     return result;
+
+        // ConvertRefsParams();
+        // functionRefs->validate_nodes_and_infer_types();
+        auto refModel = model->clone();
+
+        auto referenceInputs = std::vector<std::vector<uint8_t>>(inputs.size());
+        // auto refInputsTypes = std::vector<ngraph::element::Type>(inputs.size());
+        auto refInputsTypes = std::vector<ov::element::Type>(inputs.size());
+        for (std::size_t i = 0; i < inputs.size(); ++i) {
+            const auto& input = inputs[i];
+            // const auto inputSize = input->byteSize();
+            const auto inputSize = input->get_byte_size();
+
+            auto& referenceInput = referenceInputs[i];
+            referenceInput.resize(inputSize);
+
+            // TODO: get rid of deprecated MemoryBlob
+            // auto memory = InferenceEngine::as<InferenceEngine::MemoryBlob>(input);
+            // // IE_ASSERT(memory);
+            // OPENVINO_ASSERT(memory);
+            // const auto lockedMemory = memory->wmap();
+            // const auto buffer = lockedMemory.as<const std::uint8_t *>();
+            const auto* buffer = static_cast<const uint8_t*>(input->data());
+            std::copy(buffer, buffer + inputSize, referenceInput.data());
+
+            // refInputsTypes[i] = FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(memory->getTensorDesc().getPrecision());
+            refInputsTypes[i] = CALC_ELEMENT_TYPE;
+        }
+
+        // const auto&& outputsInfo = executableNetwork.GetOutputsInfo();
+        // std::vector<ngraph::element::Type_t> convertType;
+        // convertType.reserve(outputsInfo.size());
+        // for (const auto &output : outputsInfo) {
+        //     convertType.push_back(
+        //         FuncTestUtils::PrecisionUtils::convertIE2nGraphPrc(
+        //             output.second->getTensorDesc().getPrecision()));
+        // }
+
+        std::vector<std::pair<ngraph::element::Type, std::vector<std::uint8_t>>> expectedOutputs;
+        expectedOutputs = ngraph::helpers::interpreterFunction(refModel, referenceInputs, refInputsTypes);
+
+        std::vector<std::vector<CalcType>> res(expectedOutputs.size());
+        for (std::size_t i = 0; i < expectedOutputs.size(); ++i) {
+            EXPECT_EQ(expectedOutputs[i].first, CALC_ELEMENT_TYPE);
+            const auto& expOut = expectedOutputs[i].second;
+            auto& resOut = res[i];
+            const auto resOutSize = expOut.size() / sizeof(CalcType);
+            resOut.resize(resOutSize);
+
+            const auto* buffer = static_cast<const CalcType*>(static_cast<const void*>(expOut.data()));
+            std::copy(buffer, buffer + resOutSize, resOut.data());
+        }
+
+        return res;
+    }
+};
+
+class AddTI {
+public:
+    static std::shared_ptr<ov::Model> createNetwork() {
+        // ov::element::Type prc = CALC_ELEMENT_TYPE;
+        // ov::Shape shape{1, 2, 3, 4};
+        // ov::ParameterVector params;
+        // for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+        //     params.emplace_back(std::make_shared<ov::op::v0::Parameter>(prc, shape));
+        // }
+        // const auto add0 = ngraph::builder::makeEltwise(params[0], params[1], EltwiseTypes::ADD);
+        // const auto add1 = ngraph::builder::makeEltwise(params[2], params[3], EltwiseTypes::ADD);
+
+        // const auto mul = ngraph::builder::makeEltwise(add0, add1, EltwiseTypes::MULTIPLY);
+        // const auto result = std::make_shared<ov::op::v0::Result>(mul);
+        // return std::make_shared<ov::Model>(result, params, "AddMul");
+
+        size_t seq_lengths = 20;
+        // bool should_decompose;
+        size_t batch = 1;
+        size_t hidden_size = 10;
+        size_t input_size = 10;
+        size_t sequence_axis = 1;
+        // ngraph::helpers::TensorIteratorBody ti_body;
+        float clip = 0.0;
+        // ngraph::op::RecurrentSequenceDirection direction;
+        // InferenceEngine::Precision netPrecision;
+        ov::element::Type ngPrc = CALC_ELEMENT_TYPE;
+
+        auto tensor_iterator = std::make_shared<ngraph::opset5::TensorIterator>();
+        auto axis = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1},
+                                                               std::vector<int64_t>{static_cast<int64_t>(sequence_axis)});
+        // std::vector<std::vector<size_t>> inputShapes = {
+        //         {{batch, seq_lengths, input_size}, {batch, hidden_size}, {3 * hidden_size, input_size},
+        //                 {3 * hidden_size, hidden_size}, {3 * hidden_size}},
+        // };
+        std::vector<std::vector<size_t>> inputShapes = {{{batch, seq_lengths, input_size}, {batch, 1, input_size}}};
+        // if (sequence_axis == 0) {
+        //     // swap batch and seq_lengths
+        //     std::swap(inputShapes[0][0], inputShapes[0][1]);
+        // }
+        ov::ParameterVector outer_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+                                            std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+
+        // 1. Create TensorIterator body.
+        inputShapes[0][sequence_axis] = 1; // sliced dimension
+        ov::ParameterVector body_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+                                        std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+
+        // std::vector<ngraph::Shape> WRB = {inputShapes[2], inputShapes[3], inputShapes[4]};
+        auto squeeze = std::make_shared<ngraph::opset5::Squeeze>(body_params[0], axis);
+        // ngraph::OutputVector out_vector = {squeeze, body_params[1]};
+        // auto gru_cell = ngraph::builder::makeGRU(out_vector, WRB, hidden_size, {"sigmoid", "tanh"},
+        //                                             {}, {}, clip, false);
+        // ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(gru_cell->output(0)),
+        //                                 std::make_shared<ngraph::opset1::Result>(unsqueeze)};
+        // auto body = std::make_shared<ngraph::Function>(results, body_params, "gru_cell");
+
+        const auto add0 = ngraph::builder::makeEltwise(squeeze, body_params[1], EltwiseTypes::ADD);
+        auto unsqueeze = std::make_shared<ngraph::opset5::Unsqueeze>(add0->output(0), axis);
+
+        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(add0->output(0)),
+                                        std::make_shared<ngraph::opset1::Result>(unsqueeze)};
+        auto body = std::make_shared<ngraph::Function>(results, body_params, "add0");
         tensor_iterator->set_function(body);
 
         // 2. Set PortMap
@@ -389,10 +556,10 @@ protected:
     int currentSeed_ = SEED;
 };
 
-using GRUMultiGraphTest = CudaMultiGraphTest<GRU>;
+using GRUTIMultiGraphTest = CudaMultiGraphTest<GRUTI>;
 
-TEST_F(GRUMultiGraphTest, GRUTest) { runTest(); }
+TEST_F(GRUTIMultiGraphTest, GRUTIMultiGraphTest) { runTest(); }
 
-// using AddConcatMultiGraphTest = CudaMultiGraphTest<AddConcat>;
+using AddTIMultiGraphTest = CudaMultiGraphTest<AddTI>;
 
-// TEST_F(AddConcatMultiGraphTest, AddConcatTest) { runTest(); }
+TEST_F(AddTIMultiGraphTest, AddTIMultiGraphTest) { runTest(); }
