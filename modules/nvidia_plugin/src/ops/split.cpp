@@ -24,6 +24,10 @@ SplitOp::SplitOp(const CreationContext& context,
                  IndexCollection&& inputIds,
                  IndexCollection&& outputIds)
     : OperationBase(context, node, std::move(inputIds), std::move(outputIds)) {
+    std::cout << "((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))\n";
+    std::cout << "SplitOp::SplitOp()\n";
+    std::cout << "((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))\n";
+
     auto splitOp = dynamic_cast<const ov::op::v1::Split*>(&node);
     OPENVINO_ASSERT(splitOp, "Node name: ", GetName());
     auto input_element_type = splitOp->get_input_element_type(0);

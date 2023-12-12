@@ -18,6 +18,10 @@ static OperationBase::Ptr addFactory(const CreationContext& context,
                                      const std::shared_ptr<ov::Node>& in_node,
                                      OperationBase::IndexCollection&& inputIds,
                                      OperationBase::IndexCollection&& outputIds) {
+    std::cout << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n";
+    std::cout << "addFactory()\n";
+    std::cout << "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n";
+
     auto node = std::dynamic_pointer_cast<ov::op::v1::Add>(in_node);
     OPENVINO_ASSERT(node);
 

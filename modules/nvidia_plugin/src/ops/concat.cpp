@@ -22,6 +22,10 @@ ConcatOp::ConcatOp(const CreationContext& context,
                    IndexCollection&& outputIds)
     : OperationBase(context, concatOp, std::move(inputIds), std::move(outputIds)),
       num_inputs_{concatOp.get_input_size()} {
+    std::cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n";
+    std::cout << "ConcatOp::ConcatOp()\n";
+    std::cout << "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||\n";
+
     const ov::element::Type element_type{concatOp.get_input_element_type(0)};
     auto output_element_type = concatOp.get_output_element_type(0);
     OPENVINO_ASSERT(concatOp.get_output_size() == 1, "Node name: ", GetName());

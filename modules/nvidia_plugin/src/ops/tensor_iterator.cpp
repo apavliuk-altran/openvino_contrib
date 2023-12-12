@@ -219,10 +219,21 @@ CudaGraphCompatibility TensorIteratorOp::GetCudaGraphCompatibility() const {
     if (iterations_results_map_.size() != 1 || iterations_results_map_.count(num_iterations_ - 1) == 0) {
         return CudaGraphCompatibility::NONE;
     }
-    // TODO: Refactor
-    return SubGraph::GetCudaGraphCompatibility() == CudaGraphCompatibility::NONE ? CudaGraphCompatibility::NONE
-                                                                                 : CudaGraphCompatibility::SPECIAL;
+    // return SubGraph::GetCudaGraphCompatibility() == CudaGraphCompatibility::NONE ? CudaGraphCompatibility::NONE
+    //                                                                              : CudaGraphCompatibility::SPECIAL;
     // return SubGraph::GetCudaGraphCompatibility();
+    if (!is_compatibility_analyzed_) {
+        graph_compatibility_ = CudaGraphCompatibility::NONE;
+        for (const auto& op : exec_sequence_) {
+            auto opCompatability = op->GetCudaGraphCompatibility();
+            if (opCompatability == CudaGraphCompatibility::SPECIAL || opCompatability == CudaGraphCompatibility::FULL) {
+                graph_compatibility_ = CudaGraphCompatibility::SPECIAL;
+                break;
+            }
+        }
+        is_compatibility_analyzed_ = true;
+    }
+    return graph_compatibility_;
 }
 
 // void TensorIteratorOp::Capture(InferenceRequestContext& context,
@@ -265,6 +276,10 @@ void TensorIteratorOp::Capture(InferenceRequestContext& context,
                                Inputs inputTensors,
                                Outputs outputTensors,
                                const Workbuffers& workbuffers) const {
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+    std::cout << "TensorIteratorOp::Capture()\n";
+    std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
     auto& mutableBuffer = workbuffers.mutable_buffers.at(0);
@@ -313,6 +328,10 @@ void TensorIteratorOp::ExecuteGraph(InferenceRequestContext& context,
                                     Inputs inputTensors,
                                     Outputs outputTensors,
                                     const Workbuffers& workbuffers) const {
+    std::cout << "--------------------------------------------------------------------------------------------------\n";
+    std::cout << "TensorIteratorOp::ExecuteGraph()\n";
+    std::cout << "--------------------------------------------------------------------------------------------------\n";
+
     const auto& stream = context.getThreadContext().stream();
     const auto& memoryManager = *memory_manager_;
     const auto& mutableBuffer = workbuffers.mutable_buffers.at(0);

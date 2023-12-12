@@ -22,7 +22,7 @@ constexpr int TO = 10;
 constexpr int FROM = 0;
 constexpr int SEED = 1;
 
-constexpr std::size_t INPUTS_COUNT = 4;
+constexpr std::size_t INPUTS_COUNT = 2;
 constexpr int64_t CONCAT_AXIS = 0;
 
 constexpr float THRESHOLD = 0.01f;
@@ -50,9 +50,13 @@ void validateOutput(const ov::Tensor& tensor, const std::vector<CalcType>& refVe
     EXPECT_EQ(size, refVector.size());
     const auto* ptr = getConstPtr(tensor);
     bool areEqual = std::equal(ptr, ptr + size, refVector.cbegin(), [threshold](auto val1, auto val2) {
-// ////
-//         std::cout << "val1  = " << static_cast<float>(val1) << ", val2 = " << static_cast<float>(val2) << '\n';
-// ////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // std::cout << "val1  = " << static_cast<float>(val1) << ", val2 = " << static_cast<float>(val2) << '\n';
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         return std::abs(val1 - val2) < threshold;
     });
     EXPECT_TRUE(areEqual);
@@ -77,65 +81,65 @@ public:
         // const auto result = std::make_shared<ov::op::v0::Result>(mul);
         // return std::make_shared<ov::Model>(result, params, "AddMul");
 
-        size_t seq_lengths = 20;
+        size_t seqLengths = 20;
         // bool should_decompose;
         size_t batch = 1;
         size_t hidden_size = 10;
-        size_t input_size = 10;
-        size_t sequence_axis = 1;
+        size_t inputSize = 10;
+        size_t seqAxis = 1;
         // ngraph::helpers::TensorIteratorBody ti_body;
         float clip = 0.0;
         // ngraph::op::RecurrentSequenceDirection direction;
         // InferenceEngine::Precision netPrecision;
         ov::element::Type ngPrc = CALC_ELEMENT_TYPE;
 
-        auto tensor_iterator = std::make_shared<ngraph::opset5::TensorIterator>();
+        auto tensorIterator = std::make_shared<ngraph::opset5::TensorIterator>();
         auto axis = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1},
-                                                               std::vector<int64_t>{static_cast<int64_t>(sequence_axis)});
+                                                               std::vector<int64_t>{static_cast<int64_t>(seqAxis)});
         std::vector<std::vector<size_t>> inputShapes = {
-                {{batch, seq_lengths, input_size}, {batch, hidden_size}, {3 * hidden_size, input_size},
+                {{batch, seqLengths, inputSize}, {batch, hidden_size}, {3 * hidden_size, inputSize},
                         {3 * hidden_size, hidden_size}, {3 * hidden_size}},
         };
-        // if (sequence_axis == 0) {
-        //     // swap batch and seq_lengths
+        // if (seqAxis == 0) {
+        //     // swap batch and seqLengths
         //     std::swap(inputShapes[0][0], inputShapes[0][1]);
         // }
-        ov::ParameterVector outer_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+        ov::ParameterVector outerParams{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
                                             std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
 
         // 1. Create TensorIterator body.
-        inputShapes[0][sequence_axis] = 1; // sliced dimension
-        ov::ParameterVector body_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+        inputShapes[0][seqAxis] = 1; // sliced dimension
+        ov::ParameterVector bodyParams{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
                                         std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
 
         std::vector<ngraph::Shape> WRB = {inputShapes[2], inputShapes[3], inputShapes[4]};
-        auto squeeze = std::make_shared<ngraph::opset5::Squeeze>(body_params[0], axis);
-        ngraph::OutputVector out_vector = {squeeze, body_params[1]};
+        auto squeeze = std::make_shared<ngraph::opset5::Squeeze>(bodyParams[0], axis);
+        ngraph::OutputVector out_vector = {squeeze, bodyParams[1]};
         auto gru_cell = ngraph::builder::makeGRU(out_vector, WRB, hidden_size, {"sigmoid", "tanh"},
                                                     {}, {}, clip, false);
         auto unsqueeze = std::make_shared<ngraph::opset5::Unsqueeze>(gru_cell->output(0), axis);
         ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(gru_cell->output(0)),
                                         std::make_shared<ngraph::opset1::Result>(unsqueeze)};
-        auto body = std::make_shared<ngraph::Function>(results, body_params, "gru_cell");
-        tensor_iterator->set_function(body);
+        auto body = std::make_shared<ngraph::Function>(results, bodyParams, "gru_cell");
+        tensorIterator->set_function(body);
 
         // 2. Set PortMap
         // if (direction == ngraph::op::RecurrentSequenceDirection::FORWARD) {
-            // tensor_iterator->set_sliced_input(body_params[0], outer_params[0], 0, 1, 1, -1, sequence_axis);
-            // tensor_iterator->get_concatenated_slices(results[1], 0, 1, 1, -1, sequence_axis);
+            // tensorIterator->set_sliced_input(bodyParams[0], outerParams[0], 0, 1, 1, -1, seqAxis);
+            // tensorIterator->get_concatenated_slices(results[1], 0, 1, 1, -1, seqAxis);
         // } else if (direction == ngraph::op::RecurrentSequenceDirection::REVERSE) {
-            tensor_iterator->set_sliced_input(body_params[0], outer_params[0], -1, -1, 1, 0, sequence_axis);
-            tensor_iterator->get_concatenated_slices(results[1], -1, -1, 1, 0, sequence_axis);
+            tensorIterator->set_sliced_input(bodyParams[0], outerParams[0], -1, -1, 1, 0, seqAxis);
+            tensorIterator->get_concatenated_slices(results[1], -1, -1, 1, 0, seqAxis);
         // } else {
         //     NGRAPH_CHECK(false, "Bidirectional case is not supported.");
         // }
 
-        tensor_iterator->set_merged_input(body_params[1], outer_params[1], results[0]);
-        tensor_iterator->get_iter_value(results[0]);
+        tensorIterator->set_merged_input(bodyParams[1], outerParams[1], results[0]);
+        tensorIterator->get_iter_value(results[0]);
 
         // 3. Outer function
-        // function = std::make_shared<ngraph::Function>(ngraph::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
-        return std::make_shared<ov::Model>(ov::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
+        // function = std::make_shared<ngraph::Function>(ngraph::OutputVector{tensorIterator->output(0), tensorIterator->output(1)}, outerParams);
+        return std::make_shared<ov::Model>(ov::OutputVector{tensorIterator->output(0), tensorIterator->output(1)}, outerParams);
     }
 
     static void checkContext(const CudaGraphContext& cudaGraphContext) {
@@ -223,86 +227,151 @@ public:
 
 class AddTI {
 public:
-    static std::shared_ptr<ov::Model> createNetwork() {
-        // ov::element::Type prc = CALC_ELEMENT_TYPE;
-        // ov::Shape shape{1, 2, 3, 4};
-        // ov::ParameterVector params;
-        // for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
-        //     params.emplace_back(std::make_shared<ov::op::v0::Parameter>(prc, shape));
-        // }
-        // const auto add0 = ngraph::builder::makeEltwise(params[0], params[1], EltwiseTypes::ADD);
-        // const auto add1 = ngraph::builder::makeEltwise(params[2], params[3], EltwiseTypes::ADD);
+    static void createNetworkInternal(std::shared_ptr<ov::Model>& model) {
+//         ov::element::Type prc = CALC_ELEMENT_TYPE;
+//         ov::Shape shape{1, 2, 3, 4};
+//         ov::ParameterVector params;
+//         for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+//             params.emplace_back(std::make_shared<ov::op::v0::Parameter>(prc, shape));
+//         }
+//         const auto add0 = ngraph::builder::makeEltwise(params[0], params[1], EltwiseTypes::ADD);
+//         const auto add1 = ngraph::builder::makeEltwise(params[2], params[3], EltwiseTypes::ADD);
 
-        // const auto mul = ngraph::builder::makeEltwise(add0, add1, EltwiseTypes::MULTIPLY);
-        // const auto result = std::make_shared<ov::op::v0::Result>(mul);
-        // return std::make_shared<ov::Model>(result, params, "AddMul");
+//         constexpr int64_t axis = CONCAT_AXIS;
+//         const auto concat =
+//             std::make_shared<ov::op::v0::Concat>(ov::OutputVector{add0, add1}, axis);
+//         const auto result = std::make_shared<ov::op::v0::Result>(concat);
+//         return std::make_shared<ov::Model>(result, params, "AddConcat");
 
-        size_t seq_lengths = 20;
+        constexpr size_t seqLengths = 20;
         // bool should_decompose;
-        size_t batch = 1;
-        size_t hidden_size = 10;
-        size_t input_size = 10;
-        size_t sequence_axis = 1;
+        constexpr size_t batch = 1;
+        // size_t hidden_size = 10;
+        constexpr size_t inputSize = 10;
+        constexpr size_t seqAxis = 1;
         // ngraph::helpers::TensorIteratorBody ti_body;
-        float clip = 0.0;
+        constexpr float clip = 0.0;
         // ngraph::op::RecurrentSequenceDirection direction;
         // InferenceEngine::Precision netPrecision;
         ov::element::Type ngPrc = CALC_ELEMENT_TYPE;
 
-        auto tensor_iterator = std::make_shared<ngraph::opset5::TensorIterator>();
-        auto axis = std::make_shared<ngraph::opset5::Constant>(ngraph::element::i64, ngraph::Shape{1},
-                                                               std::vector<int64_t>{static_cast<int64_t>(sequence_axis)});
+        auto tensorIterator = std::make_shared<ov::op::v0::TensorIterator>();
+        auto axisConstant = std::make_shared<ov::op::v0::Constant>(ngraph::element::i64, ngraph::Shape{1},
+                                                               std::vector<int64_t>{static_cast<int64_t>(seqAxis)});
         // std::vector<std::vector<size_t>> inputShapes = {
-        //         {{batch, seq_lengths, input_size}, {batch, hidden_size}, {3 * hidden_size, input_size},
+        //         {{batch, seqLengths, inputSize}, {batch, hidden_size}, {3 * hidden_size, inputSize},
         //                 {3 * hidden_size, hidden_size}, {3 * hidden_size}},
         // };
-        std::vector<std::vector<size_t>> inputShapes = {{{batch, seq_lengths, input_size}, {batch, 1, input_size}}};
-        // if (sequence_axis == 0) {
-        //     // swap batch and seq_lengths
+        // std::vector<std::vector<size_t>> inputShapes = {{{batch, seqLengths, inputSize}, {batch, 1, inputSize}}};
+        std::vector<size_t> outerShape = {{batch, seqLengths, inputSize}};
+        std::vector<std::vector<size_t>> bodyShapes;
+        for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+            bodyShapes.emplace_back(std::vector<size_t>{batch, 1, inputSize});
+        }
+        // if (seqAxis == 0) {
+        //     // swap batch and seqLengths
         //     std::swap(inputShapes[0][0], inputShapes[0][1]);
         // }
-        ov::ParameterVector outer_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
-                                            std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+        // ov::ParameterVector outerParams{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+        //                                     std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+        ov::ParameterVector outerParams;
+        outerParams.emplace_back(std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape{outerShape}));
+        for (std::size_t i = 1; i < INPUTS_COUNT; ++i) {
+            outerParams.emplace_back(std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape{bodyShapes[i]}));
+        }
 
         // 1. Create TensorIterator body.
-        inputShapes[0][sequence_axis] = 1; // sliced dimension
-        ov::ParameterVector body_params{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
-                                        std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+        // inputShapes[0][seqAxis] = 1; // sliced dimension
+        for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+            ASSERT_EQ(outerShape.size(), bodyShapes[i].size());
+            for (std::size_t j = 0; j < bodyShapes[i].size(); ++j) {
+                if (j == seqAxis) {
+                    ASSERT_EQ(bodyShapes[i][j], 1);
+                    ASSERT_EQ(outerShape[j], seqLengths);
+                } else {
+                    ASSERT_EQ(bodyShapes[i][j], outerShape[j]);
+                }
+            }
+        }
+        // ov::ParameterVector bodyParams{std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[0])),
+        //                                 std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape(inputShapes[1]))};
+        ov::ParameterVector bodyParams;
+        for (std::size_t i = 0; i < INPUTS_COUNT; ++i) {
+            bodyParams.emplace_back(std::make_shared<ov::op::v0::Parameter>(ngPrc, ov::Shape{bodyShapes[i]}));
+        }
+
 
         // std::vector<ngraph::Shape> WRB = {inputShapes[2], inputShapes[3], inputShapes[4]};
-        auto squeeze = std::make_shared<ngraph::opset5::Squeeze>(body_params[0], axis);
-        // ngraph::OutputVector out_vector = {squeeze, body_params[1]};
+        // ngraph::OutputVector out_vector = {squeeze, bodyParams[1]};
         // auto gru_cell = ngraph::builder::makeGRU(out_vector, WRB, hidden_size, {"sigmoid", "tanh"},
         //                                             {}, {}, clip, false);
         // ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(gru_cell->output(0)),
         //                                 std::make_shared<ngraph::opset1::Result>(unsqueeze)};
-        // auto body = std::make_shared<ngraph::Function>(results, body_params, "gru_cell");
+        // auto body = std::make_shared<ngraph::Function>(results, bodyParams, "gru_cell");
 
-        const auto add0 = ngraph::builder::makeEltwise(squeeze, body_params[1], EltwiseTypes::ADD);
-        auto unsqueeze = std::make_shared<ngraph::opset5::Unsqueeze>(add0->output(0), axis);
+        // auto splitAxisConstant = std::make_shared<ov::op::v0::Constant>(ngraph::element::i64, ov::Shape{1}, CONCAT_AXIS);
+        // const auto split =
+        //     std::make_shared<ov::op::v1::Split>(concat->output(0), splitAxisConstant, 2);
 
-        ngraph::ResultVector results{std::make_shared<ngraph::opset1::Result>(add0->output(0)),
-                                        std::make_shared<ngraph::opset1::Result>(unsqueeze)};
-        auto body = std::make_shared<ngraph::Function>(results, body_params, "add0");
-        tensor_iterator->set_function(body);
+        // auto unsqueeze = std::make_shared<ov::op::v0::Unsqueeze>(add0->output(0), axis);
+        // ngraph::ResultVector results{std::make_shared<ov::op::v0::Result>(add0->output(0)),
+        //                                 std::make_shared<ov::op::v0::Result>(unsqueeze)};
+
+        // auto squeeze = std::make_shared<ov::op::v0::Squeeze>(bodyParams[0], axisConstant);
+        // // TODO: remove ngraph::
+        // const auto add0 = ngraph::builder::makeEltwise(squeeze, bodyParams[1], EltwiseTypes::ADD);
+
+        // const auto add1 = ngraph::builder::makeEltwise(bodyParams[2], bodyParams[3], EltwiseTypes::ADD);
+        // const auto concat =
+        //     std::make_shared<ov::op::v0::Concat>(ov::OutputVector{add0, add1}, CONCAT_AXIS);
+
+        // const auto split = ngraph::builder::makeSplit(concat->output(0), CALC_ELEMENT_TYPE, 2, CONCAT_AXIS);
+        // const auto add2 = ngraph::builder::makeEltwise(split->output(0), split->output(1), EltwiseTypes::ADD);
+
+        // auto unsqueeze = std::make_shared<ov::op::v0::Unsqueeze>(add2->output(0), axisConstant);
+        // ngraph::ResultVector results{std::make_shared<ov::op::v0::Result>(add2->output(0)),
+        //                                 std::make_shared<ov::op::v0::Result>(unsqueeze)};
+
+        auto squeeze = std::make_shared<ov::op::v0::Squeeze>(bodyParams[0], axisConstant);
+        // TODO: remove ngraph::
+        const auto split = ngraph::builder::makeSplit(squeeze, CALC_ELEMENT_TYPE, 2, 1);
+        const auto concat =
+            std::make_shared<ov::op::v0::Concat>(ov::OutputVector{split->output(0), split->output(1)}, 1);
+        const auto add0 = ngraph::builder::makeEltwise(concat->output(0), bodyParams[1], EltwiseTypes::ADD);
+
+        auto unsqueeze = std::make_shared<ov::op::v0::Unsqueeze>(add0->output(0), axisConstant);
+        ngraph::ResultVector results{std::make_shared<ov::op::v0::Result>(add0->output(0)),
+                                        std::make_shared<ov::op::v0::Result>(unsqueeze)};
+
+        auto body = std::make_shared<ngraph::Function>(results, bodyParams, "AddConcat");
+        tensorIterator->set_function(body);
 
         // 2. Set PortMap
         // if (direction == ngraph::op::RecurrentSequenceDirection::FORWARD) {
-            // tensor_iterator->set_sliced_input(body_params[0], outer_params[0], 0, 1, 1, -1, sequence_axis);
-            // tensor_iterator->get_concatenated_slices(results[1], 0, 1, 1, -1, sequence_axis);
+            // tensorIterator->set_sliced_input(bodyParams[0], outerParams[0], 0, 1, 1, -1, seqAxis);
+            // tensorIterator->get_concatenated_slices(results[1], 0, 1, 1, -1, seqAxis);
         // } else if (direction == ngraph::op::RecurrentSequenceDirection::REVERSE) {
-            tensor_iterator->set_sliced_input(body_params[0], outer_params[0], -1, -1, 1, 0, sequence_axis);
-            tensor_iterator->get_concatenated_slices(results[1], -1, -1, 1, 0, sequence_axis);
+            tensorIterator->set_sliced_input(bodyParams[0], outerParams[0], -1, -1, 1, 0, seqAxis);
+            tensorIterator->get_concatenated_slices(results[1], -1, -1, 1, 0, seqAxis);
         // } else {
         //     NGRAPH_CHECK(false, "Bidirectional case is not supported.");
         // }
 
-        tensor_iterator->set_merged_input(body_params[1], outer_params[1], results[0]);
-        tensor_iterator->get_iter_value(results[0]);
+        tensorIterator->set_merged_input(bodyParams[1], outerParams[1], results[0]);
+        // tensorIterator->set_merged_input(bodyParams[2], outerParams[2], results[0]);
+        // tensorIterator->set_merged_input(bodyParams[3], outerParams[3], results[0]);
+        tensorIterator->get_iter_value(results[0]);
 
         // 3. Outer function
-        // function = std::make_shared<ngraph::Function>(ngraph::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
-        return std::make_shared<ov::Model>(ov::OutputVector{tensor_iterator->output(0), tensor_iterator->output(1)}, outer_params);
+        // function = std::make_shared<ngraph::Function>(ngraph::OutputVector{tensorIterator->output(0), tensorIterator->output(1)}, outerParams);
+        // return std::make_shared<ov::Model>(ov::OutputVector{tensorIterator->output(0), tensorIterator->output(1)}, outerParams);
+        model = std::make_shared<ov::Model>(ov::OutputVector{tensorIterator->output(0), tensorIterator->output(1)}, outerParams);
+    }
+
+    static std::shared_ptr<ov::Model> createNetwork() {
+        std::shared_ptr<ov::Model> model;
+        createNetworkInternal(model);
+        return model;
     }
 
     static void checkContext(const CudaGraphContext& cudaGraphContext) {
